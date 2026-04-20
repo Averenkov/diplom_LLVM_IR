@@ -6,7 +6,8 @@
 - находит все определённые в модуле функции;
 - считает количество IR-инструкций в каждой функции;
 - сортирует функции по размеру;
-- выводит верхние 20% функций по числу инструкций.
+- выводит верхние 20% функций по числу инструкций;
+- строит агрегированное представление для всей translation unit.
 
 Это можно использовать как базовый шаг для дальнейшей агрегации эвристик
 с уровня отдельных функций на уровень единицы трансляции.
@@ -17,6 +18,8 @@
 - `cpp/main.cpp` - небольшой тестовый пример;
 - `cpp/run.sh` - вспомогательный скрипт сборки и запуска pass-плагина;
 - `python/compile_gym_bridge.py` - мост между `CompilerGym` и локальным LLVM-pass;
+- `python/aggregate_tu_score.py` - агрегация function-level score в TU-level score;
+- `python/autotune_tu.py` - простой контур автонастройки по TU-метрике;
 - `python/setup_compiler_gym_env.sh` - подготовка совместимого `CompilerGym`-окружения;
 - `cpp/CMakeLists.txt` - сборка pass-плагина через CMake.
 
@@ -77,6 +80,18 @@ top20-biggest-funcs
 Это упрощает дальнейшую агрегацию на уровне translation unit и интеграцию
 с внешним контуром автонастройки.
 
+Теперь JSON содержит не только список выбранных функций, но и блок
+`translation_unit_aggregation` с агрегированными метриками уровня TU:
+
+- доля инструкций в доминирующей функции;
+- доля инструкций в top-3 и top-5 функциях;
+- средний, медианный размер функции и стандартное отклонение;
+- показатели концентрации `HHI` и `Gini`;
+- веса `selected_weight_percent` для выбранных функций.
+
+Эти веса можно использовать как метод переноса function-level сигналов
+на уровень всей единицы трансляции.
+
 ## Интеграция с CompilerGym
 
 Подготовлен базовый мост `python/compile_gym_bridge.py`, который:
@@ -136,9 +151,69 @@ cp /tmp/ncurses-5.9-701/lib/libncurses.so.5 ./.miniforge/envs/cgym-py310/lib/lib
 - складывает туда runtime и benchmark-данные `CompilerGym`;
 - подготавливает `LD_LIBRARY_PATH` для старого `compiler_gym-llvm-service`.
 
+## Агрегация на TU
+
+Следующий шаг дипломной работы теперь реализован в базовом виде:
+из размера выбранных функций формируются веса, по которым можно агрегировать
+любые function-level оценки в один TU-level score.
+
+Пример входного файла со значениями функций:
+
+```json
+{
+  "function_scores": [
+    { "name": "qsortx", "score": 0.9 },
+    { "name": "main1", "score": 0.4 }
+  ]
+}
+```
+
+Агрегация:
+
+```bash
+python3 python/aggregate_tu_score.py \
+  --weights-json python/result.json \
+  --scores-json function_scores.json \
+  --output tu_score.json
+```
+
+Скрипт возьмёт `selected_weight_percent` из JSON pass-а и вычислит
+взвешенный TU-level score.
+
+## Автонастройка по TU-метрике
+
+Добавлен базовый autotuning-контур `python/autotune_tu.py`.
+Он:
+
+- сэмплирует последовательности оптимизаций в `CompilerGym`;
+- применяет их к benchmark;
+- запускает наш LLVM pass на полученном bitcode;
+- ранжирует последовательности по выбранной TU-метрике.
+
+Пример:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/autotune_tu.py \
+  --benchmark cbench-v1/qsort \
+  --trials 8 \
+  --steps 6 \
+  --objective top_3_share_percent \
+  --output autotune_qsort.json
+```
+
+Можно оптимизировать, например:
+
+- `selected_ir_share_percent`
+- `dominant_function_share_percent`
+- `top_3_share_percent`
+- `top_5_share_percent`
+- `size_concentration_hhi`
+- `size_gini`
+
 ## Дальнейшее развитие
 
 Логичное следующее направление для дипломной работы:
 
-- перейти от простого ранжирования функций к агрегации на уровне translation unit;
-- встроить pass в контур автонастройки компилятора.
+- перейти от случайного поиска к более осмысленной стратегии выбора pass-последовательностей;
+- сравнить поведение стандартных reward `CompilerGym` и TU-level метрик агрегации;
+- оформить экспериментальную методику и набор метрик для главы диплома.
