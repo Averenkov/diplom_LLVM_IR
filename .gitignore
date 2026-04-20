@@ -1,0 +1,8 @@
+cpp/build/
+cpp/*.bc
+cpp/*.ll
+cpp/*.json
+python/__pycache__/
+.venv/
+.miniforge/
+.compiler_gym/
