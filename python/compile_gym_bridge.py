@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 
 def parse_args() -> argparse.Namespace:
@@ -146,32 +147,58 @@ def configure_runtime_library_path() -> None:
         os.environ["LD_LIBRARY_PATH"] = ":".join(paths)
 
 
-def main() -> int:
-    args = parse_args()
-    cpp_dir = Path(args.cpp_dir).resolve()
-    project_root = cpp_dir.parent
+def analyze_benchmark(
+    benchmark: str,
+    env_name: str = "llvm-v0",
+    actions: list[int] | None = None,
+    fraction: float = 0.20,
+    cpp_dir: Path | None = None,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    resolved_cpp_dir = (
+        cpp_dir.resolve()
+        if cpp_dir is not None
+        else Path(__file__).resolve().parents[1] / "cpp"
+    )
+    project_root = resolved_cpp_dir.parent
     configure_compiler_gym_dirs(project_root)
     configure_runtime_library_path()
     compiler_gym = ensure_compiler_gym()
 
-    build_plugin(cpp_dir)
-    plugin_path = locate_plugin(cpp_dir)
+    build_plugin(resolved_cpp_dir)
+    plugin_path = locate_plugin(resolved_cpp_dir)
     opt_bin = locate_opt()
-    actions = parse_actions(args.actions)
-    output_path = Path(args.output).resolve() if args.output else None
+    resolved_actions = actions or []
 
-    with compiler_gym.make(args.env, benchmark=args.benchmark) as env:
+    with compiler_gym.make(env_name, benchmark=benchmark) as env:
         env.reset()
-        if actions:
-            env.multistep(actions)
+        if resolved_actions:
+            env.multistep(resolved_actions)
         bitcode = env.observation["Bitcode"]
 
     with tempfile.TemporaryDirectory(prefix="compile_gym_bridge_") as tmpdir:
         workdir = Path(tmpdir)
         bitcode_path = write_bitcode(bitcode, workdir)
         final_output = output_path or (workdir / "top20.json")
-        run_pass(opt_bin, plugin_path, bitcode_path, final_output, args.fraction)
+        run_pass(opt_bin, plugin_path, bitcode_path, final_output, fraction)
         payload = json.loads(final_output.read_text(encoding="utf-8"))
+
+    payload["benchmark"] = benchmark
+    payload["compiler_gym_env"] = env_name
+    payload["actions"] = resolved_actions
+    return payload
+
+
+def main() -> int:
+    args = parse_args()
+    payload = analyze_benchmark(
+        benchmark=args.benchmark,
+        env_name=args.env,
+        actions=parse_actions(args.actions),
+        fraction=args.fraction,
+        cpp_dir=Path(args.cpp_dir),
+        output_path=Path(args.output).resolve() if args.output else None,
+    )
 
     print(json.dumps(payload, indent=2, sort_keys=False))
     return 0
