@@ -154,6 +154,7 @@ def analyze_benchmark(
     fraction: float = 0.20,
     cpp_dir: Path | None = None,
     output_path: Path | None = None,
+    rebuild_plugin: bool = True,
 ) -> dict[str, Any]:
     resolved_cpp_dir = (
         cpp_dir.resolve()
@@ -165,7 +166,8 @@ def analyze_benchmark(
     configure_runtime_library_path()
     compiler_gym = ensure_compiler_gym()
 
-    build_plugin(resolved_cpp_dir)
+    if rebuild_plugin:
+        build_plugin(resolved_cpp_dir)
     plugin_path = locate_plugin(resolved_cpp_dir)
     opt_bin = locate_opt()
     resolved_actions = actions or []

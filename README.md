@@ -210,6 +210,51 @@ python3 python/aggregate_tu_score.py \
 - `size_concentration_hhi`
 - `size_gini`
 
+## Экспериментальная серия
+
+Для следующего этапа добавлен воспроизводимый сценарий серии экспериментов:
+`python/run_experimental_series.py`.
+
+Он запускает для набора benchmark'ов:
+
+- baseline без оптимизационных действий;
+- несколько случайных последовательностей pass-действий;
+- анализ каждого состояния нашим LLVM-pass;
+- сбор TU-level метрик в `series.json`, `summary.csv` и `rankings.json`.
+
+Минимальный smoke-run:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_experimental_series.py \
+  --benchmarks cbench-v1/qsort \
+  --trials 2 \
+  --steps 3
+```
+
+Пилотная серия:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_experimental_series.py \
+  --benchmarks cbench-v1/qsort,cbench-v1/dijkstra,cbench-v1/stringsearch,cbench-v1/rijndael \
+  --trials 4 \
+  --steps 6 \
+  --seed 7
+```
+
+Результаты сохраняются в:
+
+```text
+experiments/runs/<timestamp>/
+```
+
+Для генерации краткого Markdown-отчёта:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/summarize_experiment.py \
+  experiments/runs/<timestamp>/series.json \
+  --output experiments/runs/<timestamp>/report.md
+```
+
 ## Дальнейшее развитие
 
 Логичное следующее направление для дипломной работы:
