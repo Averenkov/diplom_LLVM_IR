@@ -210,7 +210,6 @@ python3 python/aggregate_tu_score.py \
 - `size_concentration_hhi`
 - `size_gini`
 
-<<<<<<< HEAD
 ## Экспериментальная серия
 
 Для следующего этапа добавлен воспроизводимый сценарий серии экспериментов:
@@ -254,7 +253,10 @@ experiments/runs/<timestamp>/
 ./.miniforge/envs/cgym-py310/bin/python python/summarize_experiment.py \
   experiments/runs/<timestamp>/series.json \
   --output experiments/runs/<timestamp>/report.md
-=======
+```
+
+## Автонастройка benchmark subset
+
 Для серии benchmark'ов есть `python/run_subset_autotune.py`. По умолчанию он
 использует случайный поиск, но также поддерживает модели выбора pass'ов,
 вынесенные в `python/pass_selection_models.py`:
@@ -306,6 +308,25 @@ pass/action id для каждой позиции.
 Он пишет summary по стратегиям, per-benchmark таблицу победителей и Markdown
 отчет для вставки в экспериментальную часть.
 
+Для проверки устойчивости по нескольким seed используется
+`python/run_strategy_sweep.py`:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_strategy_sweep.py \
+  --benchmark-file experiments/runs/20260426T145536Z/benchmark_set_multifunction.csv \
+  --strategies random,bandit,contextual_bandit,cem \
+  --seeds 7,11,17,23,31 \
+  --trials 30 \
+  --steps 12 \
+  --limit 10 \
+  --output-dir experiments/runs/sweep_seed_stability
+```
+
+Скрипт создает отдельный каталог на каждую пару `strategy x seed`, сохраняет
+`run.log`, `subset_autotune.json`, `subset_autotune_summary.csv`, а затем пишет
+агрегированные `sweep_run_summary.csv`, `sweep_strategy_summary.csv` и
+`sweep_report.md`.
+
 ## Набор benchmark'ов для экспериментальной серии
 
 Для основной экспериментальной серии зафиксирован конкретный набор LLVM
@@ -332,7 +353,6 @@ experiments/benchmark_sets/compiler_gym_target_suites.csv
 ```bash
 ./.miniforge/envs/cgym-py310/bin/python python/analyze_benchmark_set.py \
   --benchmark-file experiments/benchmark_sets/compiler_gym_target_suites.csv
->>>>>>> 751c700 (Add subset autotuning pass selection models)
 ```
 
 ## Дальнейшее развитие
