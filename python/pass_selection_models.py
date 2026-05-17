@@ -17,10 +17,19 @@ def random_sequence(rng: random.Random, action_count: int, steps: int) -> list[i
 
 
 class PassSelector(Protocol):
-    def select(self, trial: int) -> tuple[str, list[int]]:
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
         """Return a trial kind label and a sequence of action ids."""
 
-    def update(self, actions: list[int], reward: float) -> None:
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         """Update the selector after a successful sequence evaluation."""
 
     def snapshot(self, top_n: int = 20) -> dict[str, Any]:
@@ -33,10 +42,19 @@ class RandomPassSelector:
     steps: int
     rng: random.Random
 
-    def select(self, trial: int) -> tuple[str, list[int]]:
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
         return "random", random_sequence(self.rng, self.action_count, self.steps)
 
-    def update(self, actions: list[int], reward: float) -> None:
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         return None
 
     def snapshot(self, top_n: int = 20) -> dict[str, Any]:
@@ -64,7 +82,11 @@ class BanditPassSelector:
         self.counts = [0 for _ in range(self.action_count)]
         self.values = [0.0 for _ in range(self.action_count)]
 
-    def select(self, trial: int) -> tuple[str, list[int]]:
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
         if trial <= self.warmup:
             return "random", random_sequence(self.rng, self.action_count, self.steps)
         return "bandit", [self._choose_action() for _ in range(self.steps)]
@@ -87,7 +109,12 @@ class BanditPassSelector:
                 best_actions.append(action)
         return self.rng.choice(best_actions)
 
-    def update(self, actions: list[int], reward: float) -> None:
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         for action in actions:
             self.total_updates += 1
             self.counts[action] += 1
@@ -114,6 +141,154 @@ class BanditPassSelector:
                     "value": self.values[action],
                 }
                 for action in ranked[:top_n]
+            ],
+        }
+
+
+@dataclass
+class ContextualLinearBanditPassSelector:
+    """Linear contextual bandit over benchmark-level IR features."""
+
+    action_count: int
+    steps: int
+    rng: random.Random
+    warmup: int
+    epsilon: float
+    ucb: float
+    learning_rate: float
+    l2: float
+    suite_buckets: int
+    counts: list[int] = field(init=False)
+    weights: list[list[float]] = field(init=False)
+    total_updates: int = 0
+    feature_names: list[str] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.warmup = max(0, self.warmup)
+        self.epsilon = clamp(self.epsilon, 0.0, 1.0)
+        self.ucb = max(0.0, self.ucb)
+        self.learning_rate = max(0.0, self.learning_rate)
+        self.l2 = max(0.0, self.l2)
+        self.suite_buckets = max(1, self.suite_buckets)
+        self.feature_names = [
+            "bias",
+            "log_total_ir",
+            "log_functions",
+            "selected_share",
+            "size_gini",
+            "size_hhi",
+        ] + [f"suite_bucket_{index}" for index in range(self.suite_buckets)]
+        self.counts = [0 for _ in range(self.action_count)]
+        self.weights = [
+            [0.0 for _ in self.feature_names] for _ in range(self.action_count)
+        ]
+
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
+        if trial <= self.warmup:
+            return "random", random_sequence(self.rng, self.action_count, self.steps)
+        features = self._features(context)
+        return "contextual_bandit", [
+            self._choose_action(features) for _ in range(self.steps)
+        ]
+
+    def _choose_action(self, features: list[float]) -> int:
+        if self.rng.random() < self.epsilon:
+            return self.rng.randrange(self.action_count)
+
+        log_total = math.log(self.total_updates + 2)
+        best_score: float | None = None
+        best_actions: list[int] = []
+        for action in range(self.action_count):
+            prediction = self._predict(action, features)
+            exploration = self.ucb * math.sqrt(log_total / (self.counts[action] + 1))
+            score = prediction + exploration
+            if best_score is None or score > best_score:
+                best_score = score
+                best_actions = [action]
+            elif score == best_score:
+                best_actions.append(action)
+        return self.rng.choice(best_actions)
+
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        features = self._features(context)
+        for action in actions:
+            self.total_updates += 1
+            self.counts[action] += 1
+            prediction = self._predict(action, features)
+            error = reward - prediction
+            weights = self.weights[action]
+            for index, feature in enumerate(features):
+                regularization = self.l2 * weights[index]
+                weights[index] += self.learning_rate * (error * feature - regularization)
+
+    def _features(self, context: dict[str, Any] | None) -> list[float]:
+        context = context or {}
+        total_ir = float(context.get("total_ir_insts") or 0.0)
+        functions = float(context.get("functions_defined") or 0.0)
+        selected_share = float(context.get("selected_share_percent") or 0.0) / 100.0
+        size_gini = float(context.get("size_gini") or 0.0)
+        size_hhi = float(context.get("size_concentration_hhi") or 0.0)
+
+        features = [
+            1.0,
+            math.log1p(max(0.0, total_ir)) / 12.0,
+            math.log1p(max(0.0, functions)) / 8.0,
+            clamp(selected_share, 0.0, 1.0),
+            clamp(size_gini, 0.0, 1.0),
+            clamp(size_hhi, 0.0, 1.0),
+        ]
+        suite_bucket = self._suite_bucket(str(context.get("suite", "")))
+        features.extend(
+            1.0 if index == suite_bucket else 0.0
+            for index in range(self.suite_buckets)
+        )
+        return features
+
+    def _suite_bucket(self, suite: str) -> int:
+        value = 0
+        for char in suite:
+            value = (value * 131 + ord(char)) % 2_147_483_647
+        return value % self.suite_buckets
+
+    def _predict(self, action: int, features: list[float]) -> float:
+        return sum(
+            weight * feature
+            for weight, feature in zip(self.weights[action], features)
+        )
+
+    def snapshot(self, top_n: int = 20) -> dict[str, Any]:
+        ranked = sorted(
+            range(self.action_count),
+            key=lambda action: (self.counts[action], max(self.weights[action])),
+            reverse=True,
+        )
+        return {
+            "type": "contextual_linear_bandit",
+            "warmup": self.warmup,
+            "epsilon": self.epsilon,
+            "ucb": self.ucb,
+            "learning_rate": self.learning_rate,
+            "l2": self.l2,
+            "suite_buckets": self.suite_buckets,
+            "feature_names": self.feature_names,
+            "total_updates": self.total_updates,
+            "top_actions": [
+                {
+                    "action": action,
+                    "count": self.counts[action],
+                    "weights": self.weights[action],
+                }
+                for action in ranked[:top_n]
+                if self.counts[action] > 0
             ],
         }
 
@@ -157,7 +332,11 @@ class CrossEntropyPassSelector:
             [uniform for _ in range(self.action_count)] for _ in range(self.steps)
         ]
 
-    def select(self, trial: int) -> tuple[str, list[int]]:
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
         if trial <= self.warmup or len(self.outcomes) < self.elite_size:
             return "random", random_sequence(self.rng, self.action_count, self.steps)
 
@@ -167,7 +346,12 @@ class CrossEntropyPassSelector:
         best = max(candidates, key=self._sequence_log_probability)
         return "cem", best
 
-    def update(self, actions: list[int], reward: float) -> None:
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         if len(actions) != self.steps:
             return
         self.outcomes.append(Outcome(actions=list(actions), reward=reward))
@@ -276,6 +460,9 @@ def make_pass_selector(
     cem_elite_size: int,
     cem_smoothing: float,
     cem_min_prob: float,
+    context_learning_rate: float,
+    context_l2: float,
+    context_suite_buckets: int,
 ) -> PassSelector:
     if strategy == "random":
         return RandomPassSelector(action_count=action_count, steps=steps, rng=rng)
@@ -287,6 +474,18 @@ def make_pass_selector(
             warmup=warmup,
             epsilon=epsilon,
             ucb=ucb,
+        )
+    if strategy in {"contextual", "contextual_bandit"}:
+        return ContextualLinearBanditPassSelector(
+            action_count=action_count,
+            steps=steps,
+            rng=rng,
+            warmup=warmup,
+            epsilon=epsilon,
+            ucb=ucb,
+            learning_rate=context_learning_rate,
+            l2=context_l2,
+            suite_buckets=context_suite_buckets,
         )
     if strategy == "cem":
         return CrossEntropyPassSelector(

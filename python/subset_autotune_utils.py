@@ -73,6 +73,21 @@ def summarize_payload(payload: dict[str, Any], objective: str) -> dict[str, Any]
     }
 
 
+def make_benchmark_context(
+    row: dict[str, str],
+    baseline_summary: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "suite": row.get("suite", ""),
+        "functions_defined": baseline_summary.get("functions_defined") or 0,
+        "total_ir_insts": baseline_summary.get("total_ir_insts") or 0,
+        "selected_share_percent": baseline_summary.get("selected_share_percent") or 0.0,
+        "size_gini": baseline_summary.get("size_gini") or 0.0,
+        "size_concentration_hhi": baseline_summary.get("size_concentration_hhi")
+        or 0.0,
+    }
+
+
 def write_report(out_dir: Path, report: dict[str, Any]) -> None:
     (out_dir / "subset_autotune.json").write_text(
         json.dumps(report, indent=2, sort_keys=False) + "\n",

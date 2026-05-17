@@ -21,6 +21,7 @@ from pass_selection_models import make_pass_selector
 from subset_autotune_utils import (
     evaluate,
     load_rows,
+    make_benchmark_context,
     make_output_dir,
     summarize_payload,
     utc_timestamp,
@@ -50,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strategy",
         default="random",
-        choices=("random", "model", "bandit", "cem"),
+        choices=("random", "model", "bandit", "contextual", "contextual_bandit", "cem"),
         help="How to choose optimization actions. `model` is an alias for `bandit`.",
     )
     parser.add_argument(
@@ -70,6 +71,24 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1.0,
         help="UCB exploration weight for --strategy model.",
+    )
+    parser.add_argument(
+        "--context-learning-rate",
+        type=float,
+        default=0.05,
+        help="SGD learning rate for --strategy contextual_bandit.",
+    )
+    parser.add_argument(
+        "--context-l2",
+        type=float,
+        default=0.001,
+        help="L2 regularization for --strategy contextual_bandit.",
+    )
+    parser.add_argument(
+        "--context-suite-buckets",
+        type=int,
+        default=8,
+        help="Number of hashed suite buckets for contextual benchmark features.",
     )
     parser.add_argument(
         "--cem-candidates",
@@ -144,18 +163,22 @@ def main() -> int:
             cem_elite_size=args.cem_elite_size,
             cem_smoothing=args.cem_smoothing,
             cem_min_prob=args.cem_min_prob,
+            context_learning_rate=args.context_learning_rate,
+            context_l2=args.context_l2,
+            context_suite_buckets=args.context_suite_buckets,
         )
         for row_index, row in enumerate(rows, start=1):
             benchmark_uri = row["benchmark_uri"]
             evaluations = []
             print(f"[{row_index}/{len(rows)}] {benchmark_uri}", flush=True)
             baseline_score: float | None = None
+            benchmark_context = {}
             for trial in range(args.trials + 1):
                 if trial == 0:
                     kind = "baseline"
                     actions: list[int] = []
                 else:
-                    kind, actions = selector.select(trial)
+                    kind, actions = selector.select(trial, benchmark_context)
 
                 started = time.perf_counter()
                 error = ""
@@ -173,10 +196,12 @@ def main() -> int:
                     summary = summarize_payload(payload, args.objective)
                     if trial == 0:
                         baseline_score = summary["objective_value"]
+                        benchmark_context = make_benchmark_context(row, summary)
                     elif baseline_score is not None:
                         selector.update(
                             actions,
                             summary["objective_value"] - baseline_score,
+                            benchmark_context,
                         )
                 except Exception as exc:  # noqa: BLE001
                     error = f"{type(exc).__name__}: {exc}"
@@ -229,6 +254,7 @@ def main() -> int:
                     if best
                     else None,
                     "improvement": improvement,
+                    "benchmark_context": benchmark_context,
                     "evaluations": evaluations,
                 }
             )
@@ -249,6 +275,9 @@ def main() -> int:
             "model_warmup": args.model_warmup,
             "model_epsilon": args.model_epsilon,
             "model_ucb": args.model_ucb,
+            "context_learning_rate": args.context_learning_rate,
+            "context_l2": args.context_l2,
+            "context_suite_buckets": args.context_suite_buckets,
             "cem_candidates": args.cem_candidates,
             "cem_elite_size": args.cem_elite_size,
             "cem_smoothing": args.cem_smoothing,

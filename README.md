@@ -273,9 +273,18 @@ experiments/runs/<timestamp>/
 
 - `random` - равномерный случайный поиск;
 - `model` / `bandit` - online bandit-модель `epsilon-greedy + UCB`;
+- `contextual` / `contextual_bandit` - линейный contextual bandit, который
+  выбирает pass/action id с учетом baseline-признаков benchmark'а:
+  `suite`, `functions_defined`, `total_ir_insts`, `selected_share_percent`,
+  `size_gini`, `size_concentration_hhi`;
 - `cem` - Cross-Entropy Method: модель учит категориальное распределение
   pass/action id для каждой позиции последовательности и сдвигает его к elite
   последовательностям с лучшим приростом objective относительно baseline.
+
+Для `contextual_bandit` настраиваются `--context-learning-rate`,
+`--context-l2` и `--context-suite-buckets`. В итоговый JSON для каждого
+benchmark'а сохраняется `benchmark_context`, а в snapshot модели - веса
+наиболее часто обновлявшихся action id.
 
 Для `cem` настраиваются `--cem-candidates`, `--cem-elite-size`,
 `--cem-smoothing` и `--cem-min-prob`. В итоговый `subset_autotune.json`
@@ -289,6 +298,7 @@ pass/action id для каждой позиции.
 ./.miniforge/envs/cgym-py310/bin/python python/compare_autotune_runs.py \
   experiments/runs/compare_random_seed11_t30_s12/subset_autotune.json \
   experiments/runs/compare_bandit_seed11_t30_s12/subset_autotune.json \
+  experiments/runs/compare_contextual_seed11_t30_s12/subset_autotune.json \
   experiments/runs/20260517T215624Z/subset_autotune.json \
   --output-dir experiments/runs/compare_strategies_seed11_t30_s12
 ```
