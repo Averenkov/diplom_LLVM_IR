@@ -282,6 +282,20 @@ experiments/runs/<timestamp>/
 записывается состояние модели: elite-последовательности и наиболее вероятные
 pass/action id для каждой позиции.
 
+Несколько autotuning-прогонов можно сравнить скриптом
+`python/compare_autotune_runs.py`:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/compare_autotune_runs.py \
+  experiments/runs/compare_random_seed11_t30_s12/subset_autotune.json \
+  experiments/runs/compare_bandit_seed11_t30_s12/subset_autotune.json \
+  experiments/runs/20260517T215624Z/subset_autotune.json \
+  --output-dir experiments/runs/compare_strategies_seed11_t30_s12
+```
+
+Он пишет summary по стратегиям, per-benchmark таблицу победителей и Markdown
+отчет для вставки в экспериментальную часть.
+
 ## Набор benchmark'ов для экспериментальной серии
 
 Для основной экспериментальной серии зафиксирован конкретный набор LLVM
