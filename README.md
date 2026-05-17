@@ -210,6 +210,7 @@ python3 python/aggregate_tu_score.py \
 - `size_concentration_hhi`
 - `size_gini`
 
+<<<<<<< HEAD
 ## Экспериментальная серия
 
 Для следующего этапа добавлен воспроизводимый сценарий серии экспериментов:
@@ -253,12 +254,67 @@ experiments/runs/<timestamp>/
 ./.miniforge/envs/cgym-py310/bin/python python/summarize_experiment.py \
   experiments/runs/<timestamp>/series.json \
   --output experiments/runs/<timestamp>/report.md
+=======
+Для серии benchmark'ов есть `python/run_subset_autotune.py`. По умолчанию он
+использует случайный поиск, но также поддерживает модели выбора pass'ов,
+вынесенные в `python/pass_selection_models.py`:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_subset_autotune.py \
+  --benchmark-file experiments/runs/20260426T145536Z/benchmark_set_multifunction.csv \
+  --strategy cem \
+  --model-warmup 2 \
+  --trials 20 \
+  --steps 12 \
+  --seed 11
+```
+
+Доступные стратегии:
+
+- `random` - равномерный случайный поиск;
+- `model` / `bandit` - online bandit-модель `epsilon-greedy + UCB`;
+- `cem` - Cross-Entropy Method: модель учит категориальное распределение
+  pass/action id для каждой позиции последовательности и сдвигает его к elite
+  последовательностям с лучшим приростом objective относительно baseline.
+
+Для `cem` настраиваются `--cem-candidates`, `--cem-elite-size`,
+`--cem-smoothing` и `--cem-min-prob`. В итоговый `subset_autotune.json`
+записывается состояние модели: elite-последовательности и наиболее вероятные
+pass/action id для каждой позиции.
+
+## Набор benchmark'ов для экспериментальной серии
+
+Для основной экспериментальной серии зафиксирован конкретный набор LLVM
+benchmark'ов из CompilerGym:
+
+```text
+experiments/benchmark_sets/compiler_gym_target_suites.csv
+```
+
+Он покрывает `blas-v0`, `chstone-v0`, `mibench-v1`, `npb-v0`, `opencv-v0`
+и `tensorflow-v0`. В CSV указаны `benchmark_uri` и ожидаемый путь к `.bc`
+в локальном `CompilerGym` site-data.
+
+Чтобы выгрузить выбранные benchmark'и в отдельные bitcode-файлы:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/materialize_benchmarks.py \
+  --benchmark-file experiments/benchmark_sets/compiler_gym_target_suites.csv \
+  --output-dir experiments/bitcode
+```
+
+Чтобы сразу прогнать LLVM-pass по этому набору:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/analyze_benchmark_set.py \
+  --benchmark-file experiments/benchmark_sets/compiler_gym_target_suites.csv
+>>>>>>> 751c700 (Add subset autotuning pass selection models)
 ```
 
 ## Дальнейшее развитие
 
 Логичное следующее направление для дипломной работы:
 
-- перейти от случайного поиска к более осмысленной стратегии выбора pass-последовательностей;
+- расширить модель выбора pass-последовательностей контекстными признаками benchmark'а;
 - сравнить поведение стандартных reward `CompilerGym` и TU-level метрик агрегации;
 - оформить экспериментальную методику и набор метрик для главы диплома.

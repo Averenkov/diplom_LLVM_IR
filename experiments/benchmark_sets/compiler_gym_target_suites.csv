@@ -1,0 +1,105 @@
+suite,dataset_uri,benchmark_uri,compiler_gym_bc_path,selection_note
+blas,benchmark://blas-v0,benchmark://blas-v0/1,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/1.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/2,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/2.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/3,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/3.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/4,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/4.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/5,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/5.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/10,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/10.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/25,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/25.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/50,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/50.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/100,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/100.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/150,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/150.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/200,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/200.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/250,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/250.bc,spread sample from 300 BLAS bitcodes
+blas,benchmark://blas-v0,benchmark://blas-v0/300,.compiler_gym/site_data/llvm-v0/benchmark/blas-v0/contents/blas-v0/300.bc,spread sample from 300 BLAS bitcodes
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/adpcm,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/adpcm.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/aes,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/aes.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/blowfish,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/blowfish.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/dfadd,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/dfadd.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/dfdiv,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/dfdiv.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/dfmul,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/dfmul.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/dfsin,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/dfsin.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/gsm,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/gsm.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/jpeg,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/jpeg.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/mips,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/mips.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/motion,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/motion.bc,full CHStone set; bitcode is compiled lazily
+chstone,benchmark://chstone-v0,benchmark://chstone-v0/sha,.compiler_gym/site_data/llvm-v0/benchmark/chstone-v0/contents/patmos_HLS-e62d878ceb91e5a18007ca2e0a9602ee44ff7d59/benchmarks/CHStone/sha.bc,full CHStone set; bitcode is compiled lazily
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/bitcount-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/bitcount-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/bitcount-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/bitcount-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/dijkstra,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/dijkstra.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/fft-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/fft-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/fft-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/fft-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/ghostscript,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/ghostscript.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/gsm-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/gsm-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/gsm-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/gsm-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/jpeg-c-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/jpeg-c-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/jpeg-c-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/jpeg-c-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/jpeg-c-3,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/jpeg-c-3.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/jpeg-c,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/jpeg-c.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-newmdct-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-newmdct-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-newmdct-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-newmdct-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-psymodel,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-psymodel.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-quantize-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-quantize-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-quantize-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-quantize-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-takehiro-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-takehiro-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/lame-takehiro-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/lame-takehiro-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/mad-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/mad-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/mad-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/mad-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/pgp-d,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/pgp-d.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/pgp-e-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/pgp-e-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/pgp-e-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/pgp-e-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/pgp-e-3,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/pgp-e-3.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/qsort1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/qsort1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/rsynth-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/rsynth-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/rsynth-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/rsynth-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/susan-e-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/susan-e-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/susan-e-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/susan-e-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/susan-s,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/susan-s.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiff2rgba,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiff2rgba.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffdither-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffdither-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffdither-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffdither-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffdither-3,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffdither-3.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffmedian-1,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffmedian-1.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffmedian-2,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffmedian-2.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffmedian-3,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffmedian-3.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffmedian-4,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffmedian-4.bc,full MiBench manifest
+mibench,benchmark://mibench-v1,benchmark://mibench-v1/tiffmedian-5,.compiler_gym/site_data/llvm-v0/benchmark/mibench-v1/contents/mibench-v1/tiffmedian-5.bc,full MiBench manifest
+npb,benchmark://npb-v0,benchmark://npb-v0/1,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/1.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/2,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/2.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/3,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/3.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/4,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/4.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/5,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/5.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/10,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/10.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/20,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/20.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/40,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/40.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/60,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/60.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/80,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/80.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/100,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/100.bc,spread sample from 122 NPB bitcodes
+npb,benchmark://npb-v0,benchmark://npb-v0/122,.compiler_gym/site_data/llvm-v0/benchmark/npb-v0/contents/npb-v0/122.bc,spread sample from 122 NPB bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/1,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/1.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/2,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/2.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/3,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/3.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/4,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/4.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/5,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/5.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/10,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/10.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/25,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/25.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/50,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/50.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/100,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/100.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/150,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/150.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/200,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/200.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/300,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/300.bc,spread sample from 442 OpenCV bitcodes
+opencv,benchmark://opencv-v0,benchmark://opencv-v0/442,.compiler_gym/site_data/llvm-v0/benchmark/opencv-v0/contents/opencv-v0/442.bc,spread sample from 442 OpenCV bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/1,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/1.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/2,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/2.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/3,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/3.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/4,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/4.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/5,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/5.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/10,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/10.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/25,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/25.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/50,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/50.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/100,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/100.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/250,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/250.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/500,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/500.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/1000,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/1000.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/1500,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/1500.bc,spread sample from 1985 TensorFlow bitcodes
+tensorflow,benchmark://tensorflow-v0,benchmark://tensorflow-v0/1985,.compiler_gym/site_data/llvm-v0/benchmark/tensorflow-v0/contents/tensorflow-v0/1985.bc,spread sample from 1985 TensorFlow bitcodes

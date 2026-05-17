@@ -6,4 +6,8 @@ python/__pycache__/
 .venv/
 .miniforge/
 .compiler_gym/
+<<<<<<< HEAD
+=======
+experiments/bitcode/
+>>>>>>> 751c700 (Add subset autotuning pass selection models)
 experiments/runs/
