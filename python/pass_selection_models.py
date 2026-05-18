@@ -161,6 +161,7 @@ class ContextualLinearBanditPassSelector:
     counts: list[int] = field(init=False)
     weights: list[list[float]] = field(init=False)
     squared_gradients: list[list[float]] = field(init=False)
+    feature_exposure: list[list[float]] = field(init=False)
     total_updates: int = 0
     reward_count: int = 0
     reward_mean: float = 0.0
@@ -195,6 +196,9 @@ class ContextualLinearBanditPassSelector:
         self.squared_gradients = [
             [0.0 for _ in self.feature_names] for _ in range(self.action_count)
         ]
+        self.feature_exposure = [
+            [0.0 for _ in self.feature_names] for _ in range(self.action_count)
+        ]
 
     def select(
         self,
@@ -217,7 +221,9 @@ class ContextualLinearBanditPassSelector:
         best_actions: list[int] = []
         for action in range(self.action_count):
             prediction = self._predict(action, features)
-            exploration = self.ucb * math.sqrt(log_total / (self.counts[action] + 1))
+            exploration = self.ucb * math.sqrt(log_total) * self._uncertainty(
+                action, features
+            )
             score = prediction + exploration
             if best_score is None or score > best_score:
                 best_score = score
@@ -242,7 +248,9 @@ class ContextualLinearBanditPassSelector:
             error = clamp(target - prediction, -5.0, 5.0)
             weights = self.weights[action]
             squared_gradients = self.squared_gradients[action]
+            feature_exposure = self.feature_exposure[action]
             for index, feature in enumerate(features):
+                feature_exposure[index] += feature * feature
                 regularization = self.l2 * weights[index]
                 gradient = error * feature - regularization
                 squared_gradients[index] += gradient * gradient
@@ -298,6 +306,14 @@ class ContextualLinearBanditPassSelector:
             for weight, feature in zip(self.weights[action], features)
         )
 
+    def _uncertainty(self, action: int, features: list[float]) -> float:
+        exposure = self.feature_exposure[action]
+        variance = sum(
+            feature * feature / (seen + 1.0 + self.l2)
+            for feature, seen in zip(features, exposure)
+        )
+        return math.sqrt(variance / len(features))
+
     def _standardize_reward(self, reward: float) -> float:
         if self.reward_count == 0:
             return reward
@@ -331,6 +347,7 @@ class ContextualLinearBanditPassSelector:
             "suite_buckets": self.suite_buckets,
             "feature_names": self.feature_names,
             "total_updates": self.total_updates,
+            "exploration": "diagonal_contextual_ucb",
             "reward_count": self.reward_count,
             "reward_mean": self.reward_mean,
             "reward_std": math.sqrt(self.reward_m2 / (self.reward_count - 1))
