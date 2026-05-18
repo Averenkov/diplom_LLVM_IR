@@ -147,7 +147,7 @@ class BanditPassSelector:
 
 @dataclass
 class ContextualLinearBanditPassSelector:
-    """Linear contextual bandit over benchmark-level IR features."""
+    """Linear contextual bandit over benchmark and sequence-position features."""
 
     action_count: int
     steps: int
@@ -160,7 +160,11 @@ class ContextualLinearBanditPassSelector:
     suite_buckets: int
     counts: list[int] = field(init=False)
     weights: list[list[float]] = field(init=False)
+    squared_gradients: list[list[float]] = field(init=False)
     total_updates: int = 0
+    reward_count: int = 0
+    reward_mean: float = 0.0
+    reward_m2: float = 0.0
     feature_names: list[str] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -172,14 +176,23 @@ class ContextualLinearBanditPassSelector:
         self.suite_buckets = max(1, self.suite_buckets)
         self.feature_names = [
             "bias",
+            "position",
+            "position_squared",
             "log_total_ir",
             "log_functions",
             "selected_share",
             "size_gini",
             "size_hhi",
+            "log_total_ir_x_selected_share",
+            "log_total_ir_x_gini",
+            "selected_share_x_gini",
+            "selected_share_x_hhi",
         ] + [f"suite_bucket_{index}" for index in range(self.suite_buckets)]
         self.counts = [0 for _ in range(self.action_count)]
         self.weights = [
+            [0.0 for _ in self.feature_names] for _ in range(self.action_count)
+        ]
+        self.squared_gradients = [
             [0.0 for _ in self.feature_names] for _ in range(self.action_count)
         ]
 
@@ -190,9 +203,9 @@ class ContextualLinearBanditPassSelector:
     ) -> tuple[str, list[int]]:
         if trial <= self.warmup:
             return "random", random_sequence(self.rng, self.action_count, self.steps)
-        features = self._features(context)
         return "contextual_bandit", [
-            self._choose_action(features) for _ in range(self.steps)
+            self._choose_action(self._features(context, position))
+            for position in range(self.steps)
         ]
 
     def _choose_action(self, features: list[float]) -> int:
@@ -219,32 +232,52 @@ class ContextualLinearBanditPassSelector:
         reward: float,
         context: dict[str, Any] | None = None,
     ) -> None:
-        features = self._features(context)
-        for action in actions:
+        target = self._standardize_reward(reward)
+        self._observe_reward(reward)
+        for position, action in enumerate(actions):
+            features = self._features(context, position)
             self.total_updates += 1
             self.counts[action] += 1
             prediction = self._predict(action, features)
-            error = reward - prediction
+            error = clamp(target - prediction, -5.0, 5.0)
             weights = self.weights[action]
+            squared_gradients = self.squared_gradients[action]
             for index, feature in enumerate(features):
                 regularization = self.l2 * weights[index]
-                weights[index] += self.learning_rate * (error * feature - regularization)
+                gradient = error * feature - regularization
+                squared_gradients[index] += gradient * gradient
+                adjusted_lr = self.learning_rate / math.sqrt(
+                    squared_gradients[index] + 1e-8
+                )
+                weights[index] += adjusted_lr * gradient
 
-    def _features(self, context: dict[str, Any] | None) -> list[float]:
+    def _features(self, context: dict[str, Any] | None, position: int) -> list[float]:
         context = context or {}
         total_ir = float(context.get("total_ir_insts") or 0.0)
         functions = float(context.get("functions_defined") or 0.0)
         selected_share = float(context.get("selected_share_percent") or 0.0) / 100.0
         size_gini = float(context.get("size_gini") or 0.0)
         size_hhi = float(context.get("size_concentration_hhi") or 0.0)
+        log_total_ir = math.log1p(max(0.0, total_ir)) / 12.0
+        log_functions = math.log1p(max(0.0, functions)) / 8.0
+        selected_share = clamp(selected_share, 0.0, 1.0)
+        size_gini = clamp(size_gini, 0.0, 1.0)
+        size_hhi = clamp(size_hhi, 0.0, 1.0)
+        position_ratio = position / max(1, self.steps - 1)
 
         features = [
             1.0,
-            math.log1p(max(0.0, total_ir)) / 12.0,
-            math.log1p(max(0.0, functions)) / 8.0,
-            clamp(selected_share, 0.0, 1.0),
-            clamp(size_gini, 0.0, 1.0),
-            clamp(size_hhi, 0.0, 1.0),
+            position_ratio,
+            position_ratio * position_ratio,
+            log_total_ir,
+            log_functions,
+            selected_share,
+            size_gini,
+            size_hhi,
+            log_total_ir * selected_share,
+            log_total_ir * size_gini,
+            selected_share * size_gini,
+            selected_share * size_hhi,
         ]
         suite_bucket = self._suite_bucket(str(context.get("suite", "")))
         features.extend(
@@ -265,6 +298,23 @@ class ContextualLinearBanditPassSelector:
             for weight, feature in zip(self.weights[action], features)
         )
 
+    def _standardize_reward(self, reward: float) -> float:
+        if self.reward_count == 0:
+            return reward
+        if self.reward_count < 2:
+            return reward - self.reward_mean
+        variance = self.reward_m2 / (self.reward_count - 1)
+        if variance <= 1e-12:
+            return reward - self.reward_mean
+        return (reward - self.reward_mean) / math.sqrt(variance)
+
+    def _observe_reward(self, reward: float) -> None:
+        self.reward_count += 1
+        delta = reward - self.reward_mean
+        self.reward_mean += delta / self.reward_count
+        delta2 = reward - self.reward_mean
+        self.reward_m2 += delta * delta2
+
     def snapshot(self, top_n: int = 20) -> dict[str, Any]:
         ranked = sorted(
             range(self.action_count),
@@ -281,6 +331,11 @@ class ContextualLinearBanditPassSelector:
             "suite_buckets": self.suite_buckets,
             "feature_names": self.feature_names,
             "total_updates": self.total_updates,
+            "reward_count": self.reward_count,
+            "reward_mean": self.reward_mean,
+            "reward_std": math.sqrt(self.reward_m2 / (self.reward_count - 1))
+            if self.reward_count >= 2
+            else 0.0,
             "top_actions": [
                 {
                     "action": action,
