@@ -1,0 +1,3 @@
+strategy,runs,avg_improvement_mean,avg_improvement_std,avg_improvement_min,avg_improvement_max,improved_mean,total_errors,wins
+cem,1,2.8477509947579023,0.0,2.8477509947579023,2.8477509947579023,5.0,0,0.5
+contextual_cem,1,3.4144452228978692,0.0,3.4144452228978692,3.4144452228978692,5.0,0,4.5

@@ -281,7 +281,10 @@ experiments/runs/<timestamp>/
   `size_gini`, `size_concentration_hhi`;
 - `cem` - Cross-Entropy Method: модель учит категориальное распределение
   pass/action id для каждой позиции последовательности и сдвигает его к elite
-  последовательностям с лучшим приростом objective относительно baseline.
+  последовательностям с лучшим приростом objective относительно baseline;
+- `contextual_cem` / `hybrid_cem` / `hybrid` - гибридная стратегия: CEM
+  остается основным sequence-моделем, а contextual bandit задает prior по
+  action id для каждой позиции с учетом признаков benchmark'а.
 
 Для `contextual_bandit` настраиваются `--context-learning-rate`,
 `--context-l2` и `--context-suite-buckets`. В итоговый JSON для каждого
@@ -292,6 +295,10 @@ benchmark'а сохраняется `benchmark_context`, а в snapshot моде
 `--cem-smoothing` и `--cem-min-prob`. В итоговый `subset_autotune.json`
 записывается состояние модели: elite-последовательности и наиболее вероятные
 pass/action id для каждой позиции.
+
+Для `contextual_cem` дополнительно настраивается `--hybrid-context-weight`.
+Значение `0` эквивалентно чистому CEM-распределению, а значение `1` полностью
+полагается на contextual prior при сэмплировании кандидатов.
 
 Несколько autotuning-прогонов можно сравнить скриптом
 `python/compare_autotune_runs.py`:

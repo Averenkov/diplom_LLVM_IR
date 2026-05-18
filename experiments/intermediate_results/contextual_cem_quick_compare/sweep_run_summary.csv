@@ -1,0 +1,3 @@
+strategy,seed,path,benchmarks,improved,avg_improvement,median_improvement,min_improvement,max_improvement,error_count
+cem,7,experiments/runs/contextual_cem_quick_compare/cem_seed7_t8_s8/subset_autotune.json,5,5,2.8477509947579023,1.4347707470183906,0.9578533081946148,5.78875939061183,0
+contextual_cem,7,experiments/runs/contextual_cem_quick_compare/contextual_cem_seed7_t8_s8/subset_autotune.json,5,5,3.4144452228978692,3.7821791163360388,0.9866140056154507,6.032603934911393,0

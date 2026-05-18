@@ -520,6 +520,231 @@ class CrossEntropyPassSelector:
         }
 
 
+@dataclass
+class ContextualCrossEntropyPassSelector:
+    """CEM sequence model with a contextual prior over actions.
+
+    CEM captures position-wise structure from elite sequences. The contextual
+    model biases each position distribution toward actions that look promising
+    for the current benchmark features.
+    """
+
+    action_count: int
+    steps: int
+    rng: random.Random
+    warmup: int
+    epsilon: float
+    ucb: float
+    candidate_count: int
+    elite_size: int
+    smoothing: float
+    min_prob: float
+    learning_rate: float
+    l2: float
+    suite_buckets: int
+    context_weight: float
+    outcomes: list[Outcome] = field(default_factory=list)
+    probabilities: list[list[float]] = field(init=False)
+    contextual: ContextualLinearBanditPassSelector = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.warmup = max(0, self.warmup)
+        self.epsilon = clamp(self.epsilon, 0.0, 1.0)
+        self.ucb = max(0.0, self.ucb)
+        self.candidate_count = max(1, self.candidate_count)
+        self.elite_size = max(1, self.elite_size)
+        self.smoothing = clamp(self.smoothing, 0.0, 1.0)
+        self.min_prob = clamp(self.min_prob, 0.0, 1.0 / self.action_count)
+        self.context_weight = clamp(self.context_weight, 0.0, 1.0)
+        uniform = 1.0 / self.action_count
+        self.probabilities = [
+            [uniform for _ in range(self.action_count)] for _ in range(self.steps)
+        ]
+        self.contextual = ContextualLinearBanditPassSelector(
+            action_count=self.action_count,
+            steps=self.steps,
+            rng=self.rng,
+            warmup=0,
+            epsilon=0.0,
+            ucb=self.ucb,
+            learning_rate=self.learning_rate,
+            l2=self.l2,
+            suite_buckets=self.suite_buckets,
+        )
+
+    def select(
+        self,
+        trial: int,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[int]]:
+        if trial <= self.warmup or len(self.outcomes) < self.elite_size:
+            return "random", random_sequence(self.rng, self.action_count, self.steps)
+
+        distributions = [
+            self._hybrid_distribution(context, position)
+            for position in range(self.steps)
+        ]
+        candidates = [
+            self._sample_from_distributions(distributions)
+            for _ in range(self.candidate_count)
+        ]
+        best = max(
+            candidates,
+            key=lambda actions: self._sequence_log_probability(actions, distributions),
+        )
+        return "contextual_cem", best
+
+    def update(
+        self,
+        actions: list[int],
+        reward: float,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        if len(actions) != self.steps:
+            return
+        self.outcomes.append(Outcome(actions=list(actions), reward=reward))
+        self.contextual.update(actions, reward, context)
+        self._fit_distribution()
+
+    def _fit_distribution(self) -> None:
+        elite = sorted(self.outcomes, key=lambda item: item.reward, reverse=True)[
+            : self.elite_size
+        ]
+        prior = 1.0
+        floor_mass = self.min_prob * self.action_count
+        remaining_mass = max(0.0, 1.0 - floor_mass)
+
+        for position in range(self.steps):
+            counts = [prior for _ in range(self.action_count)]
+            for item in elite:
+                counts[item.actions[position]] += 1.0
+
+            total = sum(counts)
+            target = [
+                self.min_prob + remaining_mass * (count / total)
+                for count in counts
+            ]
+            blended = [
+                (1.0 - self.smoothing) * old + self.smoothing * new
+                for old, new in zip(self.probabilities[position], target)
+            ]
+            self.probabilities[position] = self._normalize(blended)
+
+    def _hybrid_distribution(
+        self, context: dict[str, Any] | None, position: int
+    ) -> list[float]:
+        cem_probs = self.probabilities[position]
+        context_probs = self._contextual_distribution(context, position)
+        blended = [
+            (1.0 - self.context_weight) * cem_prob
+            + self.context_weight * context_prob
+            for cem_prob, context_prob in zip(cem_probs, context_probs)
+        ]
+        return self._normalize_with_floor(blended)
+
+    def _contextual_distribution(
+        self, context: dict[str, Any] | None, position: int
+    ) -> list[float]:
+        features = self.contextual._features(context, position)
+        log_total = math.log(self.contextual.total_updates + 2)
+        scores = []
+        for action in range(self.action_count):
+            prediction = self.contextual._predict(action, features)
+            exploration = self.ucb * math.sqrt(log_total) * self.contextual._uncertainty(
+                action, features
+            )
+            scores.append(prediction + exploration)
+        return self._softmax(scores)
+
+    def _sample_from_distributions(self, distributions: list[list[float]]) -> list[int]:
+        actions = []
+        for probs in distributions:
+            if self.rng.random() < self.epsilon:
+                actions.append(self.rng.randrange(self.action_count))
+            else:
+                actions.append(self._sample_categorical(probs))
+        return actions
+
+    def _sample_categorical(self, probs: list[float]) -> int:
+        needle = self.rng.random()
+        cumulative = 0.0
+        for action, prob in enumerate(probs):
+            cumulative += prob
+            if needle <= cumulative:
+                return action
+        return self.action_count - 1
+
+    def _sequence_log_probability(
+        self, actions: list[int], distributions: list[list[float]]
+    ) -> float:
+        return sum(
+            math.log(max(distributions[position][action], 1e-12))
+            for position, action in enumerate(actions)
+        )
+
+    def _softmax(self, scores: list[float]) -> list[float]:
+        if not scores:
+            return []
+        shift = max(scores)
+        values = [math.exp(clamp(score - shift, -40.0, 40.0)) for score in scores]
+        return self._normalize(values)
+
+    def _normalize_with_floor(self, probs: list[float]) -> list[float]:
+        normalized = self._normalize(probs)
+        floor_mass = self.min_prob * self.action_count
+        remaining_mass = max(0.0, 1.0 - floor_mass)
+        return [
+            self.min_prob + remaining_mass * prob
+            for prob in normalized
+        ]
+
+    def _normalize(self, probs: list[float]) -> list[float]:
+        total = sum(probs)
+        if total <= 0.0:
+            return [1.0 / self.action_count for _ in range(self.action_count)]
+        return [prob / total for prob in probs]
+
+    def snapshot(self, top_n: int = 20) -> dict[str, Any]:
+        elite = sorted(self.outcomes, key=lambda item: item.reward, reverse=True)[
+            : self.elite_size
+        ]
+        top_per_position = []
+        for position in range(self.steps):
+            distribution = self._hybrid_distribution(None, position)
+            ranked = sorted(
+                range(self.action_count),
+                key=lambda action: distribution[action],
+                reverse=True,
+            )[:top_n]
+            top_per_position.append(
+                {
+                    "position": position,
+                    "top_actions": [
+                        {"action": action, "probability": distribution[action]}
+                        for action in ranked
+                    ],
+                }
+            )
+
+        return {
+            "type": "contextual_cross_entropy_sequence_model",
+            "warmup": self.warmup,
+            "epsilon": self.epsilon,
+            "ucb": self.ucb,
+            "candidate_count": self.candidate_count,
+            "elite_size": self.elite_size,
+            "smoothing": self.smoothing,
+            "min_prob": self.min_prob,
+            "context_weight": self.context_weight,
+            "observations": len(self.outcomes),
+            "elite": [
+                {"actions": item.actions, "reward": item.reward} for item in elite
+            ],
+            "positions": top_per_position,
+            "contextual": self.contextual.snapshot(top_n=top_n),
+        }
+
+
 def make_pass_selector(
     strategy: str,
     action_count: int,
@@ -535,6 +760,7 @@ def make_pass_selector(
     context_learning_rate: float,
     context_l2: float,
     context_suite_buckets: int,
+    hybrid_context_weight: float = 0.35,
 ) -> PassSelector:
     if strategy == "random":
         return RandomPassSelector(action_count=action_count, steps=steps, rng=rng)
@@ -570,5 +796,22 @@ def make_pass_selector(
             elite_size=cem_elite_size,
             smoothing=cem_smoothing,
             min_prob=cem_min_prob,
+        )
+    if strategy in {"contextual_cem", "hybrid_cem", "hybrid"}:
+        return ContextualCrossEntropyPassSelector(
+            action_count=action_count,
+            steps=steps,
+            rng=rng,
+            warmup=warmup,
+            epsilon=epsilon,
+            ucb=ucb,
+            candidate_count=cem_candidates,
+            elite_size=cem_elite_size,
+            smoothing=cem_smoothing,
+            min_prob=cem_min_prob,
+            learning_rate=context_learning_rate,
+            l2=context_l2,
+            suite_buckets=context_suite_buckets,
+            context_weight=hybrid_context_weight,
         )
     raise ValueError(f"Unknown pass selection strategy: {strategy}")

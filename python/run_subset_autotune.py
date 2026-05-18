@@ -51,7 +51,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strategy",
         default="random",
-        choices=("random", "model", "bandit", "contextual", "contextual_bandit", "cem"),
+        choices=(
+            "random",
+            "model",
+            "bandit",
+            "contextual",
+            "contextual_bandit",
+            "cem",
+            "contextual_cem",
+            "hybrid_cem",
+            "hybrid",
+        ),
         help="How to choose optimization actions. `model` is an alias for `bandit`.",
     )
     parser.add_argument(
@@ -115,6 +125,12 @@ def parse_args() -> argparse.Namespace:
         help="Minimum probability mass for each action at each CEM position.",
     )
     parser.add_argument(
+        "--hybrid-context-weight",
+        type=float,
+        default=0.35,
+        help="Contextual prior weight for --strategy contextual_cem.",
+    )
+    parser.add_argument(
         "--sort-by",
         default="total_ir_insts",
         choices=("total_ir_insts", "size_gini", "selected_share_percent"),
@@ -166,6 +182,7 @@ def main() -> int:
             context_learning_rate=args.context_learning_rate,
             context_l2=args.context_l2,
             context_suite_buckets=args.context_suite_buckets,
+            hybrid_context_weight=args.hybrid_context_weight,
         )
         for row_index, row in enumerate(rows, start=1):
             benchmark_uri = row["benchmark_uri"]
@@ -282,6 +299,7 @@ def main() -> int:
             "cem_elite_size": args.cem_elite_size,
             "cem_smoothing": args.cem_smoothing,
             "cem_min_prob": args.cem_min_prob,
+            "hybrid_context_weight": args.hybrid_context_weight,
         },
         "model": selector.snapshot(),
         "results": results,

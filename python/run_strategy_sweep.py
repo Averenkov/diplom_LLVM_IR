@@ -56,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cem-elite-size", type=int, default=5)
     parser.add_argument("--cem-smoothing", type=float, default=0.65)
     parser.add_argument("--cem-min-prob", type=float, default=0.001)
+    parser.add_argument("--hybrid-context-weight", type=float, default=0.35)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -116,6 +117,8 @@ def build_command(
         str(args.cem_smoothing),
         "--cem-min-prob",
         str(args.cem_min_prob),
+        "--hybrid-context-weight",
+        str(args.hybrid_context_weight),
         "--trials",
         str(args.trials),
         "--steps",
@@ -337,6 +340,7 @@ def publish_summaries(out_dir: Path, summary_dir: Path, args: argparse.Namespace
         "cem_elite_size": args.cem_elite_size,
         "cem_smoothing": args.cem_smoothing,
         "cem_min_prob": args.cem_min_prob,
+        "hybrid_context_weight": args.hybrid_context_weight,
         "source_output_dir": str(out_dir),
     }
     (summary_dir / "sweep_manifest.json").write_text(
