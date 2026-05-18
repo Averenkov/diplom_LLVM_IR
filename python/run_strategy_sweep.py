@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import statistics
 import subprocess
 import sys
@@ -64,6 +65,14 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print commands without running them.",
+    )
+    parser.add_argument(
+        "--summary-dir",
+        default="",
+        help=(
+            "Optional directory for lightweight published results: aggregate CSVs, "
+            "markdown report, and sweep manifest."
+        ),
     )
     return parser.parse_args()
 
@@ -295,6 +304,47 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
+def publish_summaries(out_dir: Path, summary_dir: Path, args: argparse.Namespace) -> None:
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    files = [
+        "sweep_run_summary.csv",
+        "sweep_strategy_summary.csv",
+        "sweep_benchmark_strategy_summary.csv",
+        "sweep_report.md",
+    ]
+    for filename in files:
+        source = out_dir / filename
+        if source.is_file():
+            shutil.copy2(source, summary_dir / filename)
+
+    manifest = {
+        "benchmark_file": args.benchmark_file,
+        "strategies": parse_csv(args.strategies),
+        "seeds": parse_int_csv(args.seeds),
+        "trials": args.trials,
+        "steps": args.steps,
+        "limit": args.limit,
+        "fraction": args.fraction,
+        "objective": args.objective,
+        "sort_by": args.sort_by,
+        "model_warmup": args.model_warmup,
+        "model_epsilon": args.model_epsilon,
+        "model_ucb": args.model_ucb,
+        "context_learning_rate": args.context_learning_rate,
+        "context_l2": args.context_l2,
+        "context_suite_buckets": args.context_suite_buckets,
+        "cem_candidates": args.cem_candidates,
+        "cem_elite_size": args.cem_elite_size,
+        "cem_smoothing": args.cem_smoothing,
+        "cem_min_prob": args.cem_min_prob,
+        "source_output_dir": str(out_dir),
+    }
+    (summary_dir / "sweep_manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=False) + "\n",
+        encoding="utf-8",
+    )
+
+
 def fmt(value: Any) -> str:
     return f"{value:.4f}" if isinstance(value, float) else str(value)
 
@@ -435,6 +485,10 @@ def main() -> int:
     print(f"Wrote: {out_dir / 'sweep_strategy_summary.csv'}")
     print(f"Wrote: {out_dir / 'sweep_benchmark_strategy_summary.csv'}")
     print(f"Wrote: {out_dir / 'sweep_report.md'}")
+    if args.summary_dir:
+        summary_dir = Path(args.summary_dir)
+        publish_summaries(out_dir, summary_dir, args)
+        print(f"Wrote lightweight summaries to: {summary_dir}")
     return 0
 
 

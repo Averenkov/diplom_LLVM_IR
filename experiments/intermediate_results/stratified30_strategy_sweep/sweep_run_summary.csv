@@ -1,0 +1,13 @@
+strategy,seed,path,benchmarks,improved,avg_improvement,median_improvement,min_improvement,max_improvement,error_count
+random,7,experiments/runs/stratified30_strategy_sweep/random_seed7_t12_s8/subset_autotune.json,30,30,3.396931793536952,1.9568089748987632,0.019531649452908084,19.859161014830732,1
+random,11,experiments/runs/stratified30_strategy_sweep/random_seed11_t12_s8/subset_autotune.json,30,30,4.038895396204757,1.8621153213223671,0.19616602544232364,24.982603783347145,0
+random,17,experiments/runs/stratified30_strategy_sweep/random_seed17_t12_s8/subset_autotune.json,30,30,4.757816119056536,3.0032033039069432,0.029672364346737368,19.84468046235608,0
+bandit,7,experiments/runs/stratified30_strategy_sweep/bandit_seed7_t12_s8/subset_autotune.json,30,29,4.796292185257772,3.099913459051592,0.0,21.320697977151923,0
+bandit,11,experiments/runs/stratified30_strategy_sweep/bandit_seed11_t12_s8/subset_autotune.json,30,29,3.1377689883285376,2.263435477296582,0.0,9.365045626335743,0
+bandit,17,experiments/runs/stratified30_strategy_sweep/bandit_seed17_t12_s8/subset_autotune.json,30,30,3.890855951833269,2.475278035106154,0.0028762258253181017,21.963912568980263,0
+contextual_bandit,7,experiments/runs/stratified30_strategy_sweep/contextual_bandit_seed7_t12_s8/subset_autotune.json,30,30,4.153265680745911,2.8793076422874755,0.11446228185775453,18.88061584031118,0
+contextual_bandit,11,experiments/runs/stratified30_strategy_sweep/contextual_bandit_seed11_t12_s8/subset_autotune.json,30,28,3.9391007683925854,3.0130090568434724,0.0,14.801887025108407,0
+contextual_bandit,17,experiments/runs/stratified30_strategy_sweep/contextual_bandit_seed17_t12_s8/subset_autotune.json,30,30,4.1027679281754965,2.5984186556199376,0.12084545066743146,19.859161014830732,0
+cem,7,experiments/runs/stratified30_strategy_sweep/cem_seed7_t12_s8/subset_autotune.json,30,30,3.8769523369461054,3.147975056476575,0.2471938786734711,9.365045626335743,0
+cem,11,experiments/runs/stratified30_strategy_sweep/cem_seed11_t12_s8/subset_autotune.json,30,29,4.541323757108499,3.047132792546961,0.0,19.859161014830732,0
+cem,17,experiments/runs/stratified30_strategy_sweep/cem_seed17_t12_s8/subset_autotune.json,30,30,4.239119867501468,3.4125485623843765,0.0025870648972556864,11.697204958814666,0
