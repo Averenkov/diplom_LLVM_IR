@@ -37,3 +37,14 @@ To summarize the baseline run and derive a multi-function subset:
 ./.miniforge/envs/cgym-py310/bin/python python/summarize_benchmark_set.py \
   experiments/runs/<timestamp>/benchmark_set_summary.csv
 ```
+
+To reproduce the stratified 30-benchmark autotuning subset:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/make_stratified_autotune_subset.py \
+  experiments/runs/20260426T145536Z/benchmark_set_multifunction.csv \
+  --output-csv experiments/benchmark_sets/autotune_stratified_30.csv
+```
+
+The generator also writes `autotune_stratified_30.csv.manifest.json` with the
+selection quotas, source file, and selected benchmark URIs.

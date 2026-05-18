@@ -1,0 +1,63 @@
+{
+  "input_csv": "experiments/runs/20260426T145536Z/benchmark_set_multifunction.csv",
+  "output_csv": "experiments/benchmark_sets/autotune_stratified_30.csv",
+  "size": 30,
+  "suite_quotas": {
+    "chstone": 6,
+    "mibench": 6,
+    "npb": 3,
+    "opencv": 6,
+    "tensorflow": 6
+  },
+  "sort_by": "total_ir_insts",
+  "min_functions": 2,
+  "min_ir": 100,
+  "candidate_count": 75,
+  "selected_count": 30,
+  "candidate_suites": {
+    "chstone": 11,
+    "mibench": 40,
+    "npb": 3,
+    "opencv": 10,
+    "tensorflow": 11
+  },
+  "selected_suites": {
+    "chstone": 6,
+    "mibench": 6,
+    "npb": 3,
+    "opencv": 6,
+    "tensorflow": 9
+  },
+  "selected_benchmarks": [
+    "benchmark://chstone-v0/aes",
+    "benchmark://chstone-v0/jpeg",
+    "benchmark://chstone-v0/blowfish",
+    "benchmark://chstone-v0/dfsin",
+    "benchmark://chstone-v0/gsm",
+    "benchmark://chstone-v0/adpcm",
+    "benchmark://mibench-v1/susan-e-2",
+    "benchmark://mibench-v1/lame-psymodel",
+    "benchmark://mibench-v1/jpeg-c",
+    "benchmark://mibench-v1/lame-newmdct-1",
+    "benchmark://mibench-v1/mad-1",
+    "benchmark://mibench-v1/lame-takehiro-1",
+    "benchmark://npb-v0/4",
+    "benchmark://npb-v0/3",
+    "benchmark://npb-v0/122",
+    "benchmark://opencv-v0/100",
+    "benchmark://opencv-v0/3",
+    "benchmark://opencv-v0/4",
+    "benchmark://opencv-v0/442",
+    "benchmark://opencv-v0/50",
+    "benchmark://opencv-v0/150",
+    "benchmark://tensorflow-v0/1985",
+    "benchmark://tensorflow-v0/50",
+    "benchmark://tensorflow-v0/5",
+    "benchmark://tensorflow-v0/2",
+    "benchmark://tensorflow-v0/4",
+    "benchmark://tensorflow-v0/1500",
+    "benchmark://tensorflow-v0/500",
+    "benchmark://tensorflow-v0/3",
+    "benchmark://tensorflow-v0/25"
+  ]
+}
