@@ -189,7 +189,7 @@ def aggregate_by_strategy(run_rows: list[dict[str, Any]]) -> list[dict[str, Any]
     return rows
 
 
-def compute_wins(result_paths: list[Path]) -> dict[str, int]:
+def compute_wins(result_paths: list[Path]) -> dict[str, int | float]:
     by_case: dict[tuple[int, str], list[tuple[str, float]]] = {}
     for path in result_paths:
         payload = load_json(path)
@@ -199,7 +199,7 @@ def compute_wins(result_paths: list[Path]) -> dict[str, int]:
             key = (seed, item["benchmark_uri"])
             by_case.setdefault(key, []).append((strategy, as_float(item["improvement"])))
 
-    wins: dict[str, int] = {}
+    wins: dict[str, float] = {}
     for candidates in by_case.values():
         if not candidates:
             continue
@@ -208,7 +208,81 @@ def compute_wins(result_paths: list[Path]) -> dict[str, int]:
         share = 1.0 / len(winners)
         for strategy in winners:
             wins[strategy] = wins.get(strategy, 0) + share
-    return {strategy: int(value) if float(value).is_integer() else value for strategy, value in wins.items()}
+    return {
+        strategy: int(value) if float(value).is_integer() else value
+        for strategy, value in wins.items()
+    }
+
+
+def aggregate_by_benchmark(
+    result_paths: list[Path], strategies: list[str]
+) -> list[dict[str, Any]]:
+    by_benchmark: dict[str, dict[str, list[tuple[int, float]]]] = {}
+    by_seed_case: dict[tuple[str, int], list[tuple[str, float]]] = {}
+
+    for path in result_paths:
+        payload = load_json(path)
+        strategy = payload["config"]["strategy"]
+        seed = int(payload["config"]["seed"])
+        for item in payload["results"]:
+            benchmark = item["benchmark_uri"]
+            improvement = as_float(item.get("improvement"))
+            by_benchmark.setdefault(benchmark, {}).setdefault(strategy, []).append(
+                (seed, improvement)
+            )
+            by_seed_case.setdefault((benchmark, seed), []).append((strategy, improvement))
+
+    seed_wins: dict[str, dict[str, float]] = {}
+    for (benchmark, _seed), candidates in by_seed_case.items():
+        if not candidates:
+            continue
+        best_value = max(value for _, value in candidates)
+        winners = [strategy for strategy, value in candidates if value == best_value]
+        share = 1.0 / len(winners)
+        bucket = seed_wins.setdefault(benchmark, {})
+        for strategy in winners:
+            bucket[strategy] = bucket.get(strategy, 0.0) + share
+
+    rows: list[dict[str, Any]] = []
+    for benchmark, strategy_items in sorted(by_benchmark.items()):
+        strategy_means = {
+            strategy: statistics.mean([value for _, value in values])
+            for strategy, values in strategy_items.items()
+            if values
+        }
+        ranked_means = sorted(
+            strategy_means.items(), key=lambda item: item[1], reverse=True
+        )
+        best_mean = ranked_means[0][1] if ranked_means else 0.0
+        best_strategies = [
+            strategy for strategy, value in ranked_means if value == best_mean
+        ]
+        second_mean = (
+            ranked_means[len(best_strategies)][1]
+            if len(ranked_means) > len(best_strategies)
+            else best_mean
+        )
+
+        row: dict[str, Any] = {
+            "benchmark_uri": benchmark,
+            "best_strategy": ",".join(best_strategies),
+            "best_mean": best_mean,
+            "best_margin": best_mean - second_mean,
+        }
+        for strategy in strategies:
+            values = [value for _, value in strategy_items.get(strategy, [])]
+            wins = seed_wins.get(benchmark, {}).get(strategy, 0.0)
+            row[f"{strategy}_runs"] = len(values)
+            row[f"{strategy}_mean"] = statistics.mean(values) if values else 0.0
+            row[f"{strategy}_std"] = statistics.stdev(values) if len(values) >= 2 else 0.0
+            row[f"{strategy}_min"] = min(values) if values else 0.0
+            row[f"{strategy}_max"] = max(values) if values else 0.0
+            row[f"{strategy}_improved_runs"] = len([value for value in values if value > 0])
+            row[f"{strategy}_seed_wins"] = (
+                int(wins) if float(wins).is_integer() else wins
+            )
+        rows.append(row)
+    return rows
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -228,6 +302,8 @@ def fmt(value: Any) -> str:
 def render_report(
     strategy_rows: list[dict[str, Any]],
     run_rows: list[dict[str, Any]],
+    benchmark_rows: list[dict[str, Any]],
+    strategies: list[str],
     args: argparse.Namespace,
 ) -> str:
     lines = [
@@ -252,6 +328,30 @@ def render_report(
             f"{fmt(row['avg_improvement_max'])} | "
             f"{fmt(row['improved_mean'])} | {row['wins']} | "
             f"{row['total_errors']} |"
+        )
+
+    mean_columns = [f"{strategy}_mean" for strategy in strategies]
+    lines.extend(
+        [
+            "",
+            "## Per-Benchmark Aggregate",
+            "",
+            "| Benchmark | Best strategy | Best mean | Margin | "
+            + " | ".join(f"{strategy} mean" for strategy in strategies)
+            + " |",
+            "| --- | --- | ---: | ---: | "
+            + " | ".join("---:" for _ in strategies)
+            + " |",
+        ]
+    )
+    for row in sorted(
+        benchmark_rows, key=lambda item: as_float(item["best_margin"]), reverse=True
+    ):
+        lines.append(
+            f"| `{row['benchmark_uri']}` | {row['best_strategy']} | "
+            f"{fmt(row['best_mean'])} | {fmt(row['best_margin'])} | "
+            + " | ".join(fmt(row[column]) for column in mean_columns)
+            + " |"
         )
 
     lines.extend(
@@ -320,17 +420,20 @@ def main() -> int:
     existing_results = [path for path in result_paths if path.is_file()]
     run_rows = [summarize_run(path) for path in existing_results]
     strategy_rows = aggregate_by_strategy(run_rows)
+    benchmark_rows = aggregate_by_benchmark(existing_results, strategies)
     wins = compute_wins(existing_results)
     for row in strategy_rows:
         row["wins"] = wins.get(row["strategy"], 0)
 
     write_csv(out_dir / "sweep_run_summary.csv", run_rows)
     write_csv(out_dir / "sweep_strategy_summary.csv", strategy_rows)
-    report = render_report(strategy_rows, run_rows, args)
+    write_csv(out_dir / "sweep_benchmark_strategy_summary.csv", benchmark_rows)
+    report = render_report(strategy_rows, run_rows, benchmark_rows, strategies, args)
     (out_dir / "sweep_report.md").write_text(report + "\n", encoding="utf-8")
     print(report)
     print(f"\nWrote: {out_dir / 'sweep_run_summary.csv'}")
     print(f"Wrote: {out_dir / 'sweep_strategy_summary.csv'}")
+    print(f"Wrote: {out_dir / 'sweep_benchmark_strategy_summary.csv'}")
     print(f"Wrote: {out_dir / 'sweep_report.md'}")
     return 0
 
