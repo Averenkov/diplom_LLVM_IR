@@ -45,6 +45,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--fraction", type=float, default=0.20)
     parser.add_argument("--objective", default="selected_share_percent")
+    parser.add_argument(
+        "--objective-direction",
+        default="maximize",
+        choices=("maximize", "minimize"),
+        help="Whether larger or smaller objective values are better.",
+    )
     parser.add_argument("--sort-by", default="total_ir_insts")
     parser.add_argument("--model-warmup", type=int, default=3)
     parser.add_argument("--model-epsilon", type=float, default=0.20)
@@ -131,6 +137,8 @@ def build_command(
         str(args.fraction),
         "--objective",
         args.objective,
+        "--objective-direction",
+        args.objective_direction,
         "--sort-by",
         args.sort_by,
         "--output-dir",
@@ -150,11 +158,21 @@ def summarize_run(path: Path) -> dict[str, Any]:
     payload = load_json(path)
     config = payload["config"]
     improvements = [as_float(item.get("improvement")) for item in payload["results"]]
+    best_vs_oz_values = [
+        as_float(item.get("best_vs_oz"))
+        for item in payload["results"]
+        if item.get("best_vs_oz") not in (None, "")
+    ]
     errors = [
         evaluation.get("error", "")
         for item in payload["results"]
         for evaluation in item.get("evaluations", [])
         if evaluation.get("error")
+    ]
+    oz_errors = [
+        item.get("oz_baseline", {}).get("error", "")
+        for item in payload["results"]
+        if item.get("oz_baseline", {}).get("error")
     ]
     return {
         "strategy": config["strategy"],
@@ -166,7 +184,12 @@ def summarize_run(path: Path) -> dict[str, Any]:
         "median_improvement": statistics.median(improvements) if improvements else 0.0,
         "min_improvement": min(improvements) if improvements else 0.0,
         "max_improvement": max(improvements) if improvements else 0.0,
+        "oz_beaten": len([value for value in best_vs_oz_values if value > 0]),
+        "avg_best_vs_oz": statistics.mean(best_vs_oz_values)
+        if best_vs_oz_values
+        else 0.0,
         "error_count": len(errors),
+        "oz_error_count": len(oz_errors),
     }
 
 
@@ -178,7 +201,9 @@ def aggregate_by_strategy(run_rows: list[dict[str, Any]]) -> list[dict[str, Any]
     rows = []
     for strategy, items in sorted(grouped.items()):
         avg_values = [as_float(item["avg_improvement"]) for item in items]
+        avg_best_vs_oz_values = [as_float(item["avg_best_vs_oz"]) for item in items]
         improved_values = [as_float(item["improved"]) for item in items]
+        oz_beaten_values = [as_float(item["oz_beaten"]) for item in items]
         rows.append(
             {
                 "strategy": strategy,
@@ -194,7 +219,14 @@ def aggregate_by_strategy(run_rows: list[dict[str, Any]]) -> list[dict[str, Any]
                 "improved_mean": statistics.mean(improved_values)
                 if improved_values
                 else 0.0,
+                "oz_beaten_mean": statistics.mean(oz_beaten_values)
+                if oz_beaten_values
+                else 0.0,
+                "avg_best_vs_oz_mean": statistics.mean(avg_best_vs_oz_values)
+                if avg_best_vs_oz_values
+                else 0.0,
                 "total_errors": sum(int(item["error_count"]) for item in items),
+                "total_oz_errors": sum(int(item["oz_error_count"]) for item in items),
                 "wins": 0,
             }
         )
@@ -329,6 +361,7 @@ def publish_summaries(out_dir: Path, summary_dir: Path, args: argparse.Namespace
         "limit": args.limit,
         "fraction": args.fraction,
         "objective": args.objective,
+        "objective_direction": args.objective_direction,
         "sort_by": args.sort_by,
         "model_warmup": args.model_warmup,
         "model_epsilon": args.model_epsilon,
@@ -367,11 +400,12 @@ def render_report(
         f"- Strategies: `{args.strategies}`",
         f"- Seeds: `{args.seeds}`",
         f"- Budget: trials={args.trials}, steps={args.steps}, limit={args.limit}",
+        f"- Objective: `{args.objective}` ({args.objective_direction})",
         "",
         "## Strategy Aggregate",
         "",
-        "| Strategy | Runs | Avg mean | Avg std | Avg min | Avg max | Improved mean | Wins | Errors |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Strategy | Runs | Avg mean | Avg std | Avg min | Avg max | Improved mean | Oz beaten mean | Avg best vs Oz | Wins | Errors | Oz errors |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in strategy_rows:
         lines.append(
@@ -380,8 +414,10 @@ def render_report(
             f"{fmt(row['avg_improvement_std'])} | "
             f"{fmt(row['avg_improvement_min'])} | "
             f"{fmt(row['avg_improvement_max'])} | "
-            f"{fmt(row['improved_mean'])} | {row['wins']} | "
-            f"{row['total_errors']} |"
+            f"{fmt(row['improved_mean'])} | "
+            f"{fmt(row['oz_beaten_mean'])} | "
+            f"{fmt(row['avg_best_vs_oz_mean'])} | {row['wins']} | "
+            f"{row['total_errors']} | {row['total_oz_errors']} |"
         )
 
     mean_columns = [f"{strategy}_mean" for strategy in strategies]
@@ -413,16 +449,17 @@ def render_report(
             "",
             "## Individual Runs",
             "",
-            "| Strategy | Seed | Avg improvement | Improved | Min | Max | Errors |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            "| Strategy | Seed | Avg improvement | Improved | Oz beaten | Avg best vs Oz | Min | Max | Errors | Oz errors |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for row in sorted(run_rows, key=lambda item: (item["strategy"], int(item["seed"]))):
         lines.append(
             f"| {row['strategy']} | {row['seed']} | "
             f"{fmt(row['avg_improvement'])} | {row['improved']} | "
+            f"{row['oz_beaten']} | {fmt(row['avg_best_vs_oz'])} | "
             f"{fmt(row['min_improvement'])} | {fmt(row['max_improvement'])} | "
-            f"{row['error_count']} |"
+            f"{row['error_count']} | {row['oz_error_count']} |"
         )
     return "\n".join(lines)
 

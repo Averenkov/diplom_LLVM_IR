@@ -300,6 +300,23 @@ pass/action id для каждой позиции.
 Значение `0` эквивалентно чистому CEM-распределению, а значение `1` полностью
 полагается на contextual prior при сэмплировании кандидатов.
 
+Для size-oriented экспериментов можно минимизировать общий размер IR:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_subset_autotune.py \
+  --benchmark-file experiments/benchmark_sets/autotune_stratified_30.csv \
+  --strategy contextual_cem \
+  --objective total_ir_insts \
+  --objective-direction minimize \
+  --trials 30 \
+  --steps 12
+```
+
+При `--objective-direction minimize` положительный `improvement` означает, что
+найденная последовательность уменьшила objective относительно baseline, а
+положительный `best_vs_oz` означает, что она уменьшила objective относительно
+`opt -Oz`.
+
 Несколько autotuning-прогонов можно сравнить скриптом
 `python/compare_autotune_runs.py`:
 
@@ -333,6 +350,16 @@ pass/action id для каждой позиции.
 `run.log`, `subset_autotune.json`, `subset_autotune_summary.csv`, а затем пишет
 агрегированные `sweep_run_summary.csv`, `sweep_strategy_summary.csv` и
 `sweep_report.md`.
+
+Каждый `run_subset_autotune.py` прогон также считает отдельный `-Oz` baseline:
+в JSON сохраняется блок `oz_baseline`, а в CSV появляются `oz_objective` и
+`best_vs_oz` для прямого сравнения найденной последовательности с `opt -Oz`.
+Этот же режим доступен в `run_strategy_sweep.py` через
+`--objective total_ir_insts --objective-direction minimize`.
+
+Для функций из baseline top-20% дополнительно сохраняются before/after размеры
+по именам функций: в JSON это `best_function_deltas` и `oz_function_deltas`, а
+в отдельном CSV - `subset_function_deltas.csv`.
 
 ## Набор benchmark'ов для экспериментальной серии
 

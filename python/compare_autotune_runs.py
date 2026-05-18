@@ -48,7 +48,13 @@ def as_float(value: Any) -> float:
 
 def summarize_run(run: dict[str, Any]) -> dict[str, Any]:
     improvements = [as_float(item.get("improvement")) for item in run["results"]]
+    best_vs_oz_values = [
+        as_float(item.get("best_vs_oz"))
+        for item in run["results"]
+        if item.get("best_vs_oz") not in (None, "")
+    ]
     improved = [value for value in improvements if value > 0]
+    oz_beaten = [value for value in best_vs_oz_values if value > 0]
     errors = [
         evaluation.get("error", "")
         for item in run["results"]
@@ -69,6 +75,10 @@ def summarize_run(run: dict[str, Any]) -> dict[str, Any]:
         "median_improvement": statistics.median(improvements) if improvements else 0.0,
         "min_improvement": min(improvements) if improvements else 0.0,
         "max_improvement": max(improvements) if improvements else 0.0,
+        "oz_beaten": len(oz_beaten),
+        "avg_best_vs_oz": statistics.mean(best_vs_oz_values)
+        if best_vs_oz_values
+        else 0.0,
         "error_count": len(errors),
         "best_kind_counts": json.dumps(best_kinds, sort_keys=True),
     }
@@ -92,6 +102,8 @@ def per_benchmark_rows(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             row[f"{prefix}_baseline"] = item.get("baseline_objective", "")
             row[f"{prefix}_best"] = item.get("best_objective", "")
             row[f"{prefix}_improvement"] = item.get("improvement", "")
+            row[f"{prefix}_oz_objective"] = item.get("oz_objective", "")
+            row[f"{prefix}_best_vs_oz"] = item.get("best_vs_oz", "")
 
     rows = []
     for row in by_benchmark.values():
@@ -127,14 +139,15 @@ def render_markdown(
         "",
         "## Strategy Summary",
         "",
-        "| Strategy | Benchmarks | Improved | Avg improvement | Median | Min | Max | Errors |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Strategy | Benchmarks | Improved | Avg improvement | Median | Min | Max | Oz beaten | Avg best vs Oz | Errors |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for item in summaries:
         lines.append(
             f"| {item['strategy']} | {item['benchmarks']} | {item['improved']} | "
             f"{fmt(item['avg_improvement'])} | {fmt(item['median_improvement'])} | "
             f"{fmt(item['min_improvement'])} | {fmt(item['max_improvement'])} | "
+            f"{item['oz_beaten']} | {fmt(item['avg_best_vs_oz'])} | "
             f"{item['error_count']} |"
         )
 

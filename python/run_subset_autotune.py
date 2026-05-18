@@ -20,9 +20,12 @@ from compile_gym_bridge import (
 from pass_selection_models import make_pass_selector
 from subset_autotune_utils import (
     evaluate,
+    evaluate_opt_level,
+    function_instruction_deltas,
     load_rows,
     make_benchmark_context,
     make_output_dir,
+    summarize_function_deltas,
     summarize_payload,
     utc_timestamp,
     write_report,
@@ -30,6 +33,7 @@ from subset_autotune_utils import (
 
 
 DEFAULT_OBJECTIVE = "selected_share_percent"
+OBJECTIVE_DIRECTIONS = ("maximize", "minimize")
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,6 +52,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--fraction", type=float, default=0.20)
     parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    parser.add_argument(
+        "--objective-direction",
+        default="maximize",
+        choices=OBJECTIVE_DIRECTIONS,
+        help="Whether larger or smaller objective values are better.",
+    )
     parser.add_argument(
         "--strategy",
         default="random",
@@ -148,6 +158,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def objective_delta(value: float, reference: float, direction: str) -> float:
+    if direction == "maximize":
+        return value - reference
+    return reference - value
+
+
+def choose_best(
+    evaluations: list[dict],
+    direction: str,
+) -> dict | None:
+    if not evaluations:
+        return None
+    key = lambda item: item["summary"]["objective_value"]
+    if direction == "maximize":
+        return max(evaluations, key=key)
+    return min(evaluations, key=key)
+
+
 def main() -> int:
     args = parse_args()
     rows = load_rows(Path(args.benchmark_file), args.sort_by, args.limit)
@@ -217,7 +245,11 @@ def main() -> int:
                     elif baseline_score is not None:
                         selector.update(
                             actions,
-                            summary["objective_value"] - baseline_score,
+                            objective_delta(
+                                summary["objective_value"],
+                                baseline_score,
+                                args.objective_direction,
+                            ),
                             benchmark_context,
                         )
                 except Exception as exc:  # noqa: BLE001
@@ -237,19 +269,45 @@ def main() -> int:
                 )
 
             successful = [item for item in evaluations if item["payload"]]
-            best = (
-                max(
-                    successful,
-                    key=lambda item: item["summary"]["objective_value"],
+            best = choose_best(successful, args.objective_direction)
+            baseline = successful[0] if successful else None
+
+            oz_error = ""
+            oz_payload = None
+            oz_summary = {}
+            oz_started = time.perf_counter()
+            try:
+                oz_payload = evaluate_opt_level(
+                    env,
+                    benchmark_uri,
+                    opt_bin,
+                    plugin_path,
+                    args.fraction,
+                    "-Oz",
                 )
-                if successful
+                oz_summary = summarize_payload(oz_payload, args.objective)
+            except Exception as exc:  # noqa: BLE001
+                oz_error = f"{type(exc).__name__}: {exc}"
+                print(f"  -Oz ERROR: {oz_error}", flush=True)
+            oz_elapsed_sec = time.perf_counter() - oz_started
+
+            improvement = (
+                objective_delta(
+                    best["summary"]["objective_value"],
+                    baseline["summary"]["objective_value"],
+                    args.objective_direction,
+                )
+                if best and baseline
                 else None
             )
-            baseline = successful[0] if successful else None
-            improvement = (
-                best["summary"]["objective_value"]
-                - baseline["summary"]["objective_value"]
-                if best and baseline
+            oz_objective = oz_summary.get("objective_value")
+            best_vs_oz = (
+                objective_delta(
+                    best["summary"]["objective_value"],
+                    oz_objective,
+                    args.objective_direction,
+                )
+                if best and oz_objective is not None
                 else None
             )
             print(
@@ -258,6 +316,25 @@ def main() -> int:
                 else "  no successful trials",
                 flush=True,
             )
+            if oz_objective is not None and best_vs_oz is not None:
+                print(
+                    f"  -Oz objective={oz_objective:.4f}, best_vs_oz={best_vs_oz:.4f}",
+                    flush=True,
+                )
+            baseline_payload = baseline["payload"] if baseline else None
+            best_payload = best["payload"] if best else None
+            best_function_deltas = function_instruction_deltas(
+                baseline_payload,
+                best_payload,
+            )
+            oz_function_deltas = function_instruction_deltas(
+                baseline_payload,
+                oz_payload,
+            )
+            best_function_delta_summary = summarize_function_deltas(
+                best_function_deltas
+            )
+            oz_function_delta_summary = summarize_function_deltas(oz_function_deltas)
             results.append(
                 {
                     "suite": row.get("suite", ""),
@@ -271,6 +348,24 @@ def main() -> int:
                     if best
                     else None,
                     "improvement": improvement,
+                    "selected_function_instruction_delta": (
+                        best_function_delta_summary["instruction_delta"]
+                    ),
+                    "oz_objective": oz_objective,
+                    "best_vs_oz": best_vs_oz,
+                    "oz_selected_function_instruction_delta": (
+                        oz_function_delta_summary["instruction_delta"]
+                    ),
+                    "best_function_delta_summary": best_function_delta_summary,
+                    "best_function_deltas": best_function_deltas,
+                    "oz_function_delta_summary": oz_function_delta_summary,
+                    "oz_function_deltas": oz_function_deltas,
+                    "oz_baseline": {
+                        "elapsed_sec": oz_elapsed_sec,
+                        "error": oz_error,
+                        "summary": oz_summary,
+                        "payload": oz_payload,
+                    },
                     "benchmark_context": benchmark_context,
                     "evaluations": evaluations,
                 }
@@ -287,6 +382,7 @@ def main() -> int:
             "limit": args.limit,
             "fraction": args.fraction,
             "objective": args.objective,
+            "objective_direction": args.objective_direction,
             "sort_by": args.sort_by,
             "strategy": args.strategy,
             "model_warmup": args.model_warmup,
@@ -308,6 +404,7 @@ def main() -> int:
 
     print(f"Wrote: {out_dir / 'subset_autotune.json'}")
     print(f"Wrote: {out_dir / 'subset_autotune_summary.csv'}")
+    print(f"Wrote: {out_dir / 'subset_function_deltas.csv'}")
     return 0
 
 

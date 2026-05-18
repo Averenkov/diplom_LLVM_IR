@@ -190,6 +190,19 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
         TopFunctions.emplace_back(std::move(Func));
       }
 
+      json::Array FunctionInstructionCounts;
+      for (size_t I = 0; I < FuncCounts.size(); ++I) {
+        json::Object Func{
+            {"rank", static_cast<int64_t>(I + 1)},
+            {"name", FuncCounts[I].Name},
+            {"instruction_count",
+             static_cast<int64_t>(FuncCounts[I].InstructionCount)},
+            {"module_share_percent",
+             computeSharePercent(FuncCounts[I].InstructionCount, Total)},
+        };
+        FunctionInstructionCounts.emplace_back(std::move(Func));
+      }
+
       json::Object TranslationUnitAggregation{
           {"aggregation_scope", "translation_unit"},
           {"aggregation_method", "weighted-top-fraction-by-ir-count"},
@@ -218,6 +231,7 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
           {"translation_unit_aggregation",
            std::move(TranslationUnitAggregation)},
           {"top_functions", std::move(TopFunctions)},
+          {"function_instruction_counts", std::move(FunctionInstructionCounts)},
       };
 
       std::error_code EC;
