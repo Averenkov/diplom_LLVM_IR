@@ -1,0 +1,34 @@
+{
+  "benchmark_file": "experiments/benchmark_sets/autotune_stratified_30.csv",
+  "strategies": [
+    "random",
+    "cem",
+    "contextual_cem"
+  ],
+  "seeds": [
+    7,
+    11,
+    17,
+    23,
+    31
+  ],
+  "trials": 30,
+  "steps": 12,
+  "limit": 0,
+  "fraction": 0.2,
+  "objective": "total_ir_insts",
+  "objective_direction": "minimize",
+  "sort_by": "total_ir_insts",
+  "model_warmup": 3,
+  "model_epsilon": 0.2,
+  "model_ucb": 1.0,
+  "context_learning_rate": 0.05,
+  "context_l2": 0.001,
+  "context_suite_buckets": 8,
+  "cem_candidates": 32,
+  "cem_elite_size": 5,
+  "cem_smoothing": 0.65,
+  "cem_min_prob": 0.001,
+  "hybrid_context_weight": 0.35,
+  "source_output_dir": "experiments/runs/stratified30_total_ir_size_sweep"
+}
