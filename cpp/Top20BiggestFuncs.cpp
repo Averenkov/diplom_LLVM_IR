@@ -1,3 +1,7 @@
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
@@ -9,6 +13,8 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,7 +38,18 @@ cl::opt<std::string> TopOutputPath(
     cl::desc("Write analysis results to a JSON file"),
     cl::init(""));
 
+cl::opt<unsigned> TopCleanupMaxIterations(
+    "top-cleanup-max-iterations",
+    cl::desc("Maximum fixed-point cleanup iterations for top-function cleanup"),
+    cl::init(4));
+
+cl::opt<bool> TopCleanupVerbose(
+    "top-cleanup-verbose",
+    cl::desc("Print per-function details for top-function cleanup"),
+    cl::init(false));
+
 struct FunctionStat {
+  Function *Func;
   std::string Name;
   uint64_t InstructionCount;
   uint64_t BasicBlockCount;
@@ -171,6 +188,104 @@ double computeDensity(uint64_t Part, uint64_t Whole) {
   if (Whole == 0)
     return 0.0;
   return static_cast<double>(Part) / static_cast<double>(Whole);
+}
+
+uint64_t countInstructions(const Function &F) {
+  uint64_t Count = 0;
+  for (const Instruction &I : instructions(F)) {
+    (void)I;
+    ++Count;
+  }
+  return Count;
+}
+
+std::vector<Function *> selectTopFunctions(Module &M, double RawFraction) {
+  std::vector<std::pair<Function *, uint64_t>> Functions;
+  for (Function &F : M) {
+    if (F.isDeclaration())
+      continue;
+    Functions.emplace_back(&F, countInstructions(F));
+  }
+
+  std::sort(Functions.begin(), Functions.end(), [](const auto &A, const auto &B) {
+    return A.second > B.second;
+  });
+
+  const double Fraction = std::clamp(RawFraction, 0.0, 1.0);
+  const size_t K =
+      Functions.empty()
+          ? 0
+          : std::max<size_t>(1, (size_t)std::ceil(Fraction * (double)Functions.size()));
+
+  std::vector<Function *> Selected;
+  Selected.reserve(K);
+  for (size_t I = 0; I < K; ++I)
+    Selected.push_back(Functions[I].first);
+  return Selected;
+}
+
+bool simplifyInstructions(Function &F, const DataLayout &DL) {
+  bool Changed = false;
+  const SimplifyQuery SQ(DL);
+
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : make_early_inc_range(BB)) {
+      if (I.use_empty())
+        continue;
+      Value *Simplified = simplifyInstruction(&I, SQ);
+      if (!Simplified || Simplified == &I)
+        continue;
+      I.replaceAllUsesWith(Simplified);
+      if (isInstructionTriviallyDead(&I)) {
+        I.eraseFromParent();
+        Changed = true;
+      }
+    }
+  }
+
+  return Changed;
+}
+
+bool deleteTriviallyDeadInstructions(Function &F) {
+  bool Changed = false;
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : make_early_inc_range(reverse(BB))) {
+      if (!isInstructionTriviallyDead(&I))
+        continue;
+      I.eraseFromParent();
+      Changed = true;
+    }
+  }
+  return Changed;
+}
+
+bool mergeTrivialBlocks(Function &F) {
+  bool Changed = false;
+  for (BasicBlock &BB : make_early_inc_range(F)) {
+    if (&BB == &F.getEntryBlock())
+      continue;
+    if (MergeBlockIntoPredecessor(&BB))
+      Changed = true;
+  }
+  return Changed;
+}
+
+bool cleanupFunctionForSize(Function &F, const DataLayout &DL) {
+  bool Changed = false;
+  const unsigned MaxIterations = std::max(1U, TopCleanupMaxIterations.getValue());
+
+  for (unsigned Iteration = 0; Iteration < MaxIterations; ++Iteration) {
+    bool IterationChanged = false;
+    IterationChanged |= removeUnreachableBlocks(F);
+    IterationChanged |= simplifyInstructions(F, DL);
+    IterationChanged |= deleteTriviallyDeadInstructions(F);
+    IterationChanged |= mergeTrivialBlocks(F);
+    if (!IterationChanged)
+      break;
+    Changed = true;
+  }
+
+  return Changed;
 }
 
 json::Object makeFunctionObject(const FunctionStat &Func, size_t Rank,
@@ -323,6 +438,7 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
         continue;
 
       FunctionStat Stat{};
+      Stat.Func = &F;
       Stat.Name = F.getName().str();
       Stat.BasicBlockCount = F.size();
       for (Instruction &I : instructions(F)) {
@@ -477,6 +593,45 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
   }
 };
 
+struct TopFunctionSizeCleanupPass : PassInfoMixin<TopFunctionSizeCleanupPass> {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
+    const std::vector<Function *> Selected =
+        selectTopFunctions(M, TopFraction.getValue());
+    if (Selected.empty()) {
+      errs() << "[top-cleanup] no defined functions\n";
+      return PreservedAnalyses::all();
+    }
+
+    const DataLayout &DL = M.getDataLayout();
+    bool Changed = false;
+    uint64_t BeforeTotal = 0;
+    uint64_t AfterTotal = 0;
+
+    errs() << "[top-cleanup] selected functions: " << Selected.size()
+           << " (top-fraction=" << std::clamp(TopFraction.getValue(), 0.0, 1.0)
+           << ")\n";
+
+    for (Function *F : Selected) {
+      const uint64_t Before = countInstructions(*F);
+      const bool FunctionChanged = cleanupFunctionForSize(*F, DL);
+      const uint64_t After = countInstructions(*F);
+      BeforeTotal += Before;
+      AfterTotal += After;
+      Changed |= FunctionChanged || Before != After;
+      if (TopCleanupVerbose)
+        errs() << "[top-cleanup] " << F->getName() << ": " << Before << " -> "
+               << After << "\n";
+    }
+
+    errs() << "[top-cleanup] selected IR insts: " << BeforeTotal << " -> "
+           << AfterTotal << " (delta="
+           << (static_cast<int64_t>(BeforeTotal) - static_cast<int64_t>(AfterTotal))
+           << ")\n";
+
+    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  }
+};
+
 }
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
@@ -488,6 +643,10 @@ llvmGetPassPluginInfo() {
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == "top20-biggest-funcs") {
                     MPM.addPass(Top20BiggestFuncsPass());
+                    return true;
+                  }
+                  if (Name == "top-function-size-cleanup") {
+                    MPM.addPass(TopFunctionSizeCleanupPass());
                     return true;
                   }
                   return false;

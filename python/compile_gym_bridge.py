@@ -116,6 +116,27 @@ def run_pass(
     subprocess.run(cmd, check=True)
 
 
+def run_size_cleanup_pass(
+    opt_bin: str,
+    plugin_path: Path,
+    bitcode_path: Path,
+    output_path: Path,
+    fraction: float,
+    max_iterations: int = 4,
+) -> None:
+    cmd = [
+        opt_bin,
+        f"-load-pass-plugin={plugin_path}",
+        "-passes=top-function-size-cleanup",
+        f"-top-fraction={fraction}",
+        f"-top-cleanup-max-iterations={max_iterations}",
+        "-o",
+        str(output_path),
+        str(bitcode_path),
+    ]
+    subprocess.run(cmd, check=True)
+
+
 def configure_compiler_gym_dirs(project_root: Path) -> None:
     cache_root = project_root / ".compiler_gym"
     cache_dir = cache_root / "cache"

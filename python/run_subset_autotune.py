@@ -150,6 +150,20 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--enable-size-cleanup-pass",
+        action="store_true",
+        help=(
+            "Apply the custom top-function size cleanup pass after each sampled "
+            "action sequence before measuring the objective."
+        ),
+    )
+    parser.add_argument(
+        "--size-cleanup-iterations",
+        type=int,
+        default=4,
+        help="Maximum fixed-point iterations for --enable-size-cleanup-pass.",
+    )
+    parser.add_argument(
         "--sort-by",
         default="total_ir_insts",
         choices=("total_ir_insts", "size_gini", "selected_share_percent"),
@@ -249,6 +263,8 @@ def main() -> int:
                         opt_bin,
                         plugin_path,
                         args.fraction,
+                        size_cleanup=args.enable_size_cleanup_pass,
+                        size_cleanup_iterations=args.size_cleanup_iterations,
                     )
                     summary = summarize_payload(payload, args.objective)
                     if trial == 0:
@@ -409,6 +425,8 @@ def main() -> int:
             "cem_min_prob": args.cem_min_prob,
             "hybrid_context_weight": args.hybrid_context_weight,
             "semantic_prior_weight": args.semantic_prior_weight,
+            "enable_size_cleanup_pass": args.enable_size_cleanup_pass,
+            "size_cleanup_iterations": args.size_cleanup_iterations,
         },
         "model": selector.snapshot(),
         "results": results,

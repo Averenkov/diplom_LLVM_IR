@@ -64,6 +64,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cem-min-prob", type=float, default=0.001)
     parser.add_argument("--hybrid-context-weight", type=float, default=0.35)
     parser.add_argument("--semantic-prior-weight", type=float, default=0.0)
+    parser.add_argument("--enable-size-cleanup-pass", action="store_true")
+    parser.add_argument("--size-cleanup-iterations", type=int, default=4)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -95,7 +97,7 @@ def build_command(
     seed: int,
     run_dir: Path,
 ) -> list[str]:
-    return [
+    cmd = [
         sys.executable,
         "python/run_subset_autotune.py",
         "--benchmark-file",
@@ -128,6 +130,8 @@ def build_command(
         str(args.hybrid_context_weight),
         "--semantic-prior-weight",
         str(args.semantic_prior_weight),
+        "--size-cleanup-iterations",
+        str(args.size_cleanup_iterations),
         "--trials",
         str(args.trials),
         "--steps",
@@ -147,6 +151,9 @@ def build_command(
         "--output-dir",
         str(run_dir),
     ]
+    if args.enable_size_cleanup_pass:
+        cmd.append("--enable-size-cleanup-pass")
+    return cmd
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -378,6 +385,8 @@ def publish_summaries(out_dir: Path, summary_dir: Path, args: argparse.Namespace
         "cem_min_prob": args.cem_min_prob,
         "hybrid_context_weight": args.hybrid_context_weight,
         "semantic_prior_weight": args.semantic_prior_weight,
+        "enable_size_cleanup_pass": args.enable_size_cleanup_pass,
+        "size_cleanup_iterations": args.size_cleanup_iterations,
         "source_output_dir": str(out_dir),
     }
     (summary_dir / "sweep_manifest.json").write_text(

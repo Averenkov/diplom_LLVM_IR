@@ -1,0 +1,11 @@
+benchmark_uri,best_strategy,best_mean,best_margin,contextual_cem_runs,contextual_cem_mean,contextual_cem_std,contextual_cem_min,contextual_cem_max,contextual_cem_improved_runs,contextual_cem_seed_wins
+benchmark://chstone-v0/aes,contextual_cem,1619.0,0.0,2,1619.0,236.17366491630688,1452.0,1786.0,2,2
+benchmark://opencv-v0/100,contextual_cem,183.5,0.0,2,183.5,72.8319984622144,132.0,235.0,2,2
+benchmark://opencv-v0/3,contextual_cem,54.0,0.0,2,54.0,16.97056274847714,42.0,66.0,2,2
+benchmark://opencv-v0/4,contextual_cem,141.0,0.0,2,141.0,118.79393923933998,57.0,225.0,2,2
+benchmark://tensorflow-v0/1500,contextual_cem,235.5,0.0,2,235.5,24.748737341529164,218.0,253.0,2,2
+benchmark://tensorflow-v0/1985,contextual_cem,3942.5,0.0,2,3942.5,4867.015974907006,501.0,7384.0,2,2
+benchmark://tensorflow-v0/2,contextual_cem,624.5,0.0,2,624.5,697.9143930311224,131.0,1118.0,2,2
+benchmark://tensorflow-v0/4,contextual_cem,18.5,0.0,2,18.5,3.5355339059327378,16.0,21.0,2,2
+benchmark://tensorflow-v0/5,contextual_cem,267.5,0.0,2,267.5,123.74368670764582,180.0,355.0,2,2
+benchmark://tensorflow-v0/50,contextual_cem,200.5,0.0,2,200.5,47.37615433949868,167.0,234.0,2,2

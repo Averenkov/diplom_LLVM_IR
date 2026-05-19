@@ -7,7 +7,8 @@
 - считает количество IR-инструкций в каждой функции;
 - сортирует функции по размеру;
 - выводит верхние 20% функций по числу инструкций;
-- строит агрегированное представление для всей translation unit.
+- строит агрегированное представление для всей translation unit;
+- дополнительно содержит экспериментальный cleanup-pass для выбранных top-функций.
 
 Это можно использовать как базовый шаг для дальнейшей агрегации эвристик
 с уровня отдельных функций на уровень единицы трансляции.
@@ -100,6 +101,19 @@ getelementptr, casts, compares, selects, integer/float/vector operations и
 `branch_density`, `vector_density`. На уровне модуля дополнительно пишутся
 `module_semantic_profile` и `selected_semantic_profile`; второй агрегирует
 только baseline top-20% функций и используется как контекст модели.
+
+В том же плагине есть экспериментальный size-oriented pass:
+
+```text
+top-function-size-cleanup
+```
+
+Он выбирает top-функции по той же `--top-fraction` и применяет к ним
+локальную безопасную чистку: удаление недостижимых блоков, упрощение
+инструкций через LLVM `InstructionSimplify`, удаление trivially-dead
+инструкций и слияние тривиальных basic block'ов. Pass не трогает остальные
+функции модуля, поэтому его можно проверять как отдельный top-function gated
+уровень поверх найденных sequence.
 
 ## Интеграция с CompilerGym
 
@@ -331,6 +345,24 @@ pass/action id для каждой позиции.
   --trials 30 \
   --steps 12
 ```
+
+Собственный cleanup-pass включается отдельным флагом:
+
+```bash
+./.miniforge/envs/cgym-py310/bin/python python/run_subset_autotune.py \
+  --benchmark-file experiments/benchmark_sets/autotune_stratified_30.csv \
+  --strategy contextual_cem \
+  --objective total_ir_insts \
+  --objective-direction minimize \
+  --enable-size-cleanup-pass \
+  --trials 30 \
+  --steps 12
+```
+
+В этом режиме `top-function-size-cleanup` запускается после каждой выбранной
+последовательности pass-ов и перед измерением метрик. Обычный `-Oz` baseline
+остается стандартным `opt -Oz`, чтобы `best_vs_oz` показывал сравнение с
+реальным LLVM baseline.
 
 При `--objective-direction minimize` положительный `improvement` означает, что
 найденная последовательность уменьшила objective относительно baseline, а

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from compile_gym_bridge import run_pass, write_bitcode
+from compile_gym_bridge import run_pass, run_size_cleanup_pass, write_bitcode
 
 
 def utc_timestamp() -> str:
@@ -46,6 +46,8 @@ def evaluate(
     opt_bin: str,
     plugin_path: Path,
     fraction: float,
+    size_cleanup: bool = False,
+    size_cleanup_iterations: int = 4,
 ) -> dict[str, Any]:
     env.reset(benchmark=benchmark_uri)
     if actions:
@@ -54,11 +56,24 @@ def evaluate(
     with tempfile.TemporaryDirectory(prefix="subset_autotune_") as tmpdir:
         workdir = Path(tmpdir)
         bitcode_path = write_bitcode(bitcode, workdir)
+        analysis_input_path = bitcode_path
+        if size_cleanup:
+            cleanup_path = workdir / "top_cleanup.bc"
+            run_size_cleanup_pass(
+                opt_bin,
+                plugin_path,
+                bitcode_path,
+                cleanup_path,
+                fraction,
+                size_cleanup_iterations,
+            )
+            analysis_input_path = cleanup_path
         output_path = workdir / "top20.json"
-        run_pass(opt_bin, plugin_path, bitcode_path, output_path, fraction)
+        run_pass(opt_bin, plugin_path, analysis_input_path, output_path, fraction)
         payload = json.loads(output_path.read_text(encoding="utf-8"))
     payload["benchmark"] = benchmark_uri
     payload["actions"] = actions
+    payload["size_cleanup_pass"] = size_cleanup
     return payload
 
 
@@ -69,6 +84,8 @@ def evaluate_opt_level(
     plugin_path: Path,
     fraction: float,
     opt_level: str,
+    size_cleanup: bool = False,
+    size_cleanup_iterations: int = 4,
 ) -> dict[str, Any]:
     env.reset(benchmark=benchmark_uri)
     bitcode = env.observation["Bitcode"]
@@ -80,12 +97,25 @@ def evaluate_opt_level(
             [opt_bin, opt_level, "-o", str(optimized_path), str(bitcode_path)],
             check=True,
         )
+        analysis_input_path = optimized_path
+        if size_cleanup:
+            cleanup_path = workdir / "top_cleanup.bc"
+            run_size_cleanup_pass(
+                opt_bin,
+                plugin_path,
+                optimized_path,
+                cleanup_path,
+                fraction,
+                size_cleanup_iterations,
+            )
+            analysis_input_path = cleanup_path
         output_path = workdir / "top20.json"
-        run_pass(opt_bin, plugin_path, optimized_path, output_path, fraction)
+        run_pass(opt_bin, plugin_path, analysis_input_path, output_path, fraction)
         payload = json.loads(output_path.read_text(encoding="utf-8"))
     payload["benchmark"] = benchmark_uri
     payload["actions"] = []
     payload["opt_level"] = opt_level
+    payload["size_cleanup_pass"] = size_cleanup
     return payload
 
 
