@@ -1,5 +1,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -34,6 +35,23 @@ cl::opt<std::string> TopOutputPath(
 struct FunctionStat {
   std::string Name;
   uint64_t InstructionCount;
+  uint64_t BasicBlockCount;
+  uint64_t BranchCount;
+  uint64_t ConditionalBranchCount;
+  uint64_t SwitchCount;
+  uint64_t CallCount;
+  uint64_t LoadCount;
+  uint64_t StoreCount;
+  uint64_t AllocaCount;
+  uint64_t PhiCount;
+  uint64_t GetElementPtrCount;
+  uint64_t CastCount;
+  uint64_t CompareCount;
+  uint64_t SelectCount;
+  uint64_t ReturnCount;
+  uint64_t IntegerOpCount;
+  uint64_t FloatOpCount;
+  uint64_t VectorOpCount;
 };
 
 double computeSharePercent(uint64_t Part, uint64_t Whole) {
@@ -105,6 +123,196 @@ uint64_t sumTopN(const std::vector<FunctionStat> &FuncCounts, size_t Count) {
   return Sum;
 }
 
+bool isIntegerArithmeticOrBitwise(const Instruction &I) {
+  switch (I.getOpcode()) {
+  case Instruction::Add:
+  case Instruction::Sub:
+  case Instruction::Mul:
+  case Instruction::UDiv:
+  case Instruction::SDiv:
+  case Instruction::URem:
+  case Instruction::SRem:
+  case Instruction::Shl:
+  case Instruction::LShr:
+  case Instruction::AShr:
+  case Instruction::And:
+  case Instruction::Or:
+  case Instruction::Xor:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool isFloatArithmetic(const Instruction &I) {
+  switch (I.getOpcode()) {
+  case Instruction::FAdd:
+  case Instruction::FSub:
+  case Instruction::FMul:
+  case Instruction::FDiv:
+  case Instruction::FRem:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool touchesVectorType(const Instruction &I) {
+  if (I.getType()->isVectorTy())
+    return true;
+  for (const Use &Operand : I.operands()) {
+    if (Operand->getType()->isVectorTy())
+      return true;
+  }
+  return false;
+}
+
+double computeDensity(uint64_t Part, uint64_t Whole) {
+  if (Whole == 0)
+    return 0.0;
+  return static_cast<double>(Part) / static_cast<double>(Whole);
+}
+
+json::Object makeFunctionObject(const FunctionStat &Func, size_t Rank,
+                                uint64_t Total, uint64_t SelectedTotal,
+                                bool IncludeSelectedWeight) {
+  json::Object Result{
+      {"rank", static_cast<int64_t>(Rank + 1)},
+      {"name", Func.Name},
+      {"instruction_count", static_cast<int64_t>(Func.InstructionCount)},
+      {"module_share_percent", computeSharePercent(Func.InstructionCount, Total)},
+      {"basic_blocks", static_cast<int64_t>(Func.BasicBlockCount)},
+      {"branches", static_cast<int64_t>(Func.BranchCount)},
+      {"conditional_branches", static_cast<int64_t>(Func.ConditionalBranchCount)},
+      {"switches", static_cast<int64_t>(Func.SwitchCount)},
+      {"calls", static_cast<int64_t>(Func.CallCount)},
+      {"loads", static_cast<int64_t>(Func.LoadCount)},
+      {"stores", static_cast<int64_t>(Func.StoreCount)},
+      {"allocas", static_cast<int64_t>(Func.AllocaCount)},
+      {"phi_nodes", static_cast<int64_t>(Func.PhiCount)},
+      {"getelementptrs", static_cast<int64_t>(Func.GetElementPtrCount)},
+      {"casts", static_cast<int64_t>(Func.CastCount)},
+      {"compares", static_cast<int64_t>(Func.CompareCount)},
+      {"selects", static_cast<int64_t>(Func.SelectCount)},
+      {"returns", static_cast<int64_t>(Func.ReturnCount)},
+      {"integer_ops", static_cast<int64_t>(Func.IntegerOpCount)},
+      {"float_ops", static_cast<int64_t>(Func.FloatOpCount)},
+      {"vector_ops", static_cast<int64_t>(Func.VectorOpCount)},
+      {"memory_ops",
+       static_cast<int64_t>(Func.LoadCount + Func.StoreCount +
+                            Func.AllocaCount + Func.GetElementPtrCount)},
+      {"call_density", computeDensity(Func.CallCount, Func.InstructionCount)},
+      {"memory_density",
+       computeDensity(Func.LoadCount + Func.StoreCount + Func.AllocaCount +
+                          Func.GetElementPtrCount,
+                      Func.InstructionCount)},
+      {"branch_density", computeDensity(Func.BranchCount + Func.SwitchCount,
+                                        Func.InstructionCount)},
+      {"conditional_branch_density",
+       computeDensity(Func.ConditionalBranchCount + Func.SwitchCount,
+                      Func.InstructionCount)},
+      {"phi_density", computeDensity(Func.PhiCount, Func.InstructionCount)},
+      {"vector_density", computeDensity(Func.VectorOpCount, Func.InstructionCount)},
+      {"float_density", computeDensity(Func.FloatOpCount, Func.InstructionCount)},
+      {"integer_density", computeDensity(Func.IntegerOpCount, Func.InstructionCount)},
+  };
+  if (IncludeSelectedWeight) {
+    Result["selected_weight_percent"] =
+        computeSharePercent(Func.InstructionCount, SelectedTotal);
+  }
+  return Result;
+}
+
+json::Object makeSemanticProfile(const std::vector<FunctionStat> &FuncCounts,
+                                 size_t Count) {
+  const size_t Limit = std::min(Count, FuncCounts.size());
+  uint64_t Insts = 0;
+  uint64_t BasicBlocks = 0;
+  uint64_t Branches = 0;
+  uint64_t ConditionalBranches = 0;
+  uint64_t Switches = 0;
+  uint64_t Calls = 0;
+  uint64_t Loads = 0;
+  uint64_t Stores = 0;
+  uint64_t Allocas = 0;
+  uint64_t Phis = 0;
+  uint64_t GEPs = 0;
+  uint64_t Casts = 0;
+  uint64_t Compares = 0;
+  uint64_t Selects = 0;
+  uint64_t Returns = 0;
+  uint64_t IntegerOps = 0;
+  uint64_t FloatOps = 0;
+  uint64_t VectorOps = 0;
+
+  for (size_t I = 0; I < Limit; ++I) {
+    const auto &Func = FuncCounts[I];
+    Insts += Func.InstructionCount;
+    BasicBlocks += Func.BasicBlockCount;
+    Branches += Func.BranchCount;
+    ConditionalBranches += Func.ConditionalBranchCount;
+    Switches += Func.SwitchCount;
+    Calls += Func.CallCount;
+    Loads += Func.LoadCount;
+    Stores += Func.StoreCount;
+    Allocas += Func.AllocaCount;
+    Phis += Func.PhiCount;
+    GEPs += Func.GetElementPtrCount;
+    Casts += Func.CastCount;
+    Compares += Func.CompareCount;
+    Selects += Func.SelectCount;
+    Returns += Func.ReturnCount;
+    IntegerOps += Func.IntegerOpCount;
+    FloatOps += Func.FloatOpCount;
+    VectorOps += Func.VectorOpCount;
+  }
+
+  const uint64_t MemoryOps = Loads + Stores + Allocas + GEPs;
+  const uint64_t BranchOps = Branches + Switches;
+  const double FunctionCount = static_cast<double>(Limit);
+  const double BasicBlocksPerFunction =
+      FunctionCount == 0.0 ? 0.0 : static_cast<double>(BasicBlocks) / FunctionCount;
+  const double LoopLikeScore =
+      computeDensity(Phis + ConditionalBranches, Insts);
+
+  return json::Object{
+      {"function_count", static_cast<int64_t>(Limit)},
+      {"instruction_count", static_cast<int64_t>(Insts)},
+      {"basic_blocks", static_cast<int64_t>(BasicBlocks)},
+      {"branches", static_cast<int64_t>(Branches)},
+      {"conditional_branches", static_cast<int64_t>(ConditionalBranches)},
+      {"switches", static_cast<int64_t>(Switches)},
+      {"calls", static_cast<int64_t>(Calls)},
+      {"loads", static_cast<int64_t>(Loads)},
+      {"stores", static_cast<int64_t>(Stores)},
+      {"allocas", static_cast<int64_t>(Allocas)},
+      {"phi_nodes", static_cast<int64_t>(Phis)},
+      {"getelementptrs", static_cast<int64_t>(GEPs)},
+      {"casts", static_cast<int64_t>(Casts)},
+      {"compares", static_cast<int64_t>(Compares)},
+      {"selects", static_cast<int64_t>(Selects)},
+      {"returns", static_cast<int64_t>(Returns)},
+      {"integer_ops", static_cast<int64_t>(IntegerOps)},
+      {"float_ops", static_cast<int64_t>(FloatOps)},
+      {"vector_ops", static_cast<int64_t>(VectorOps)},
+      {"memory_ops", static_cast<int64_t>(MemoryOps)},
+      {"call_density", computeDensity(Calls, Insts)},
+      {"memory_density", computeDensity(MemoryOps, Insts)},
+      {"branch_density", computeDensity(BranchOps, Insts)},
+      {"conditional_branch_density",
+       computeDensity(ConditionalBranches + Switches, Insts)},
+      {"phi_density", computeDensity(Phis, Insts)},
+      {"alloca_density", computeDensity(Allocas, Insts)},
+      {"vector_density", computeDensity(VectorOps, Insts)},
+      {"float_density", computeDensity(FloatOps, Insts)},
+      {"integer_density", computeDensity(IntegerOps, Insts)},
+      {"compare_density", computeDensity(Compares, Insts)},
+      {"select_density", computeDensity(Selects, Insts)},
+      {"basic_blocks_per_function", BasicBlocksPerFunction},
+      {"loop_like_score", LoopLikeScore},
+  };
+}
+
 struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
     std::vector<FunctionStat> FuncCounts;
@@ -114,13 +322,47 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
       if (F.isDeclaration())
         continue;
 
-      uint64_t Cnt = 0;
+      FunctionStat Stat{};
+      Stat.Name = F.getName().str();
+      Stat.BasicBlockCount = F.size();
       for (Instruction &I : instructions(F)) {
-        (void)I;
-        ++Cnt;
+        ++Stat.InstructionCount;
+        if (isa<BranchInst>(I)) {
+          ++Stat.BranchCount;
+          if (cast<BranchInst>(I).isConditional())
+            ++Stat.ConditionalBranchCount;
+        }
+        if (isa<SwitchInst>(I))
+          ++Stat.SwitchCount;
+        if (isa<CallBase>(I))
+          ++Stat.CallCount;
+        if (isa<LoadInst>(I))
+          ++Stat.LoadCount;
+        if (isa<StoreInst>(I))
+          ++Stat.StoreCount;
+        if (isa<AllocaInst>(I))
+          ++Stat.AllocaCount;
+        if (isa<PHINode>(I))
+          ++Stat.PhiCount;
+        if (isa<GetElementPtrInst>(I))
+          ++Stat.GetElementPtrCount;
+        if (I.isCast())
+          ++Stat.CastCount;
+        if (isa<CmpInst>(I))
+          ++Stat.CompareCount;
+        if (isa<SelectInst>(I))
+          ++Stat.SelectCount;
+        if (isa<ReturnInst>(I))
+          ++Stat.ReturnCount;
+        if (isIntegerArithmeticOrBitwise(I))
+          ++Stat.IntegerOpCount;
+        if (isFloatArithmetic(I))
+          ++Stat.FloatOpCount;
+        if (touchesVectorType(I))
+          ++Stat.VectorOpCount;
       }
 
-      FuncCounts.push_back({F.getName().str(), Cnt});
+      FuncCounts.push_back(std::move(Stat));
     }
 
     if (FuncCounts.empty()) {
@@ -177,30 +419,14 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
 
       json::Array TopFunctions;
       for (size_t I = 0; I < K; ++I) {
-        json::Object Func{
-            {"rank", static_cast<int64_t>(I + 1)},
-            {"name", FuncCounts[I].Name},
-            {"instruction_count",
-             static_cast<int64_t>(FuncCounts[I].InstructionCount)},
-            {"module_share_percent",
-             computeSharePercent(FuncCounts[I].InstructionCount, Total)},
-            {"selected_weight_percent",
-             computeSharePercent(FuncCounts[I].InstructionCount, TopSum)},
-        };
-        TopFunctions.emplace_back(std::move(Func));
+        TopFunctions.emplace_back(
+            makeFunctionObject(FuncCounts[I], I, Total, TopSum, true));
       }
 
       json::Array FunctionInstructionCounts;
       for (size_t I = 0; I < FuncCounts.size(); ++I) {
-        json::Object Func{
-            {"rank", static_cast<int64_t>(I + 1)},
-            {"name", FuncCounts[I].Name},
-            {"instruction_count",
-             static_cast<int64_t>(FuncCounts[I].InstructionCount)},
-            {"module_share_percent",
-             computeSharePercent(FuncCounts[I].InstructionCount, Total)},
-        };
-        FunctionInstructionCounts.emplace_back(std::move(Func));
+        FunctionInstructionCounts.emplace_back(
+            makeFunctionObject(FuncCounts[I], I, Total, TopSum, false));
       }
 
       json::Object TranslationUnitAggregation{
@@ -228,6 +454,9 @@ struct Top20BiggestFuncsPass : PassInfoMixin<Top20BiggestFuncsPass> {
           {"total_ir_insts", static_cast<int64_t>(Total)},
           {"selected_ir_insts", static_cast<int64_t>(TopSum)},
           {"selected_share_percent", computeSharePercent(TopSum, Total)},
+          {"module_semantic_profile",
+           makeSemanticProfile(FuncCounts, FuncCounts.size())},
+          {"selected_semantic_profile", makeSemanticProfile(FuncCounts, K)},
           {"translation_unit_aggregation",
            std::move(TranslationUnitAggregation)},
           {"top_functions", std::move(TopFunctions)},

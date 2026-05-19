@@ -7,6 +7,8 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from semantic_pass_priors import semantic_prior_distribution, top_semantic_actions
+
 
 def clamp(raw: float, lower: float, upper: float) -> float:
     return min(upper, max(lower, raw))
@@ -188,6 +190,22 @@ class ContextualLinearBanditPassSelector:
             "log_total_ir_x_gini",
             "selected_share_x_gini",
             "selected_share_x_hhi",
+            "semantic_call_density",
+            "semantic_memory_density",
+            "semantic_branch_density",
+            "semantic_conditional_branch_density",
+            "semantic_phi_density",
+            "semantic_alloca_density",
+            "semantic_vector_density",
+            "semantic_float_density",
+            "semantic_integer_density",
+            "semantic_compare_density",
+            "semantic_select_density",
+            "semantic_basic_blocks_per_function",
+            "semantic_loop_like_score",
+            "semantic_memory_x_branch",
+            "semantic_call_x_branch",
+            "semantic_loop_x_memory",
         ] + [f"suite_bucket_{index}" for index in range(self.suite_buckets)]
         self.counts = [0 for _ in range(self.action_count)]
         self.weights = [
@@ -266,11 +284,45 @@ class ContextualLinearBanditPassSelector:
         selected_share = float(context.get("selected_share_percent") or 0.0) / 100.0
         size_gini = float(context.get("size_gini") or 0.0)
         size_hhi = float(context.get("size_concentration_hhi") or 0.0)
+        call_density = float(context.get("semantic_call_density") or 0.0)
+        memory_density = float(context.get("semantic_memory_density") or 0.0)
+        branch_density = float(context.get("semantic_branch_density") or 0.0)
+        conditional_branch_density = float(
+            context.get("semantic_conditional_branch_density") or 0.0
+        )
+        phi_density = float(context.get("semantic_phi_density") or 0.0)
+        alloca_density = float(context.get("semantic_alloca_density") or 0.0)
+        vector_density = float(context.get("semantic_vector_density") or 0.0)
+        float_density = float(context.get("semantic_float_density") or 0.0)
+        integer_density = float(context.get("semantic_integer_density") or 0.0)
+        compare_density = float(context.get("semantic_compare_density") or 0.0)
+        select_density = float(context.get("semantic_select_density") or 0.0)
+        basic_blocks_per_function = float(
+            context.get("semantic_basic_blocks_per_function") or 0.0
+        )
+        loop_like_score = float(context.get("semantic_loop_like_score") or 0.0)
         log_total_ir = math.log1p(max(0.0, total_ir)) / 12.0
         log_functions = math.log1p(max(0.0, functions)) / 8.0
         selected_share = clamp(selected_share, 0.0, 1.0)
         size_gini = clamp(size_gini, 0.0, 1.0)
         size_hhi = clamp(size_hhi, 0.0, 1.0)
+        call_density = clamp(call_density, 0.0, 1.0)
+        memory_density = clamp(memory_density, 0.0, 1.0)
+        branch_density = clamp(branch_density, 0.0, 1.0)
+        conditional_branch_density = clamp(conditional_branch_density, 0.0, 1.0)
+        phi_density = clamp(phi_density, 0.0, 1.0)
+        alloca_density = clamp(alloca_density, 0.0, 1.0)
+        vector_density = clamp(vector_density, 0.0, 1.0)
+        float_density = clamp(float_density, 0.0, 1.0)
+        integer_density = clamp(integer_density, 0.0, 1.0)
+        compare_density = clamp(compare_density, 0.0, 1.0)
+        select_density = clamp(select_density, 0.0, 1.0)
+        basic_blocks_per_function = clamp(
+            math.log1p(max(0.0, basic_blocks_per_function)) / 8.0,
+            0.0,
+            1.0,
+        )
+        loop_like_score = clamp(loop_like_score, 0.0, 1.0)
         position_ratio = position / max(1, self.steps - 1)
 
         features = [
@@ -286,6 +338,22 @@ class ContextualLinearBanditPassSelector:
             log_total_ir * size_gini,
             selected_share * size_gini,
             selected_share * size_hhi,
+            call_density,
+            memory_density,
+            branch_density,
+            conditional_branch_density,
+            phi_density,
+            alloca_density,
+            vector_density,
+            float_density,
+            integer_density,
+            compare_density,
+            select_density,
+            basic_blocks_per_function,
+            loop_like_score,
+            memory_density * branch_density,
+            call_density * branch_density,
+            loop_like_score * memory_density,
         ]
         suite_bucket = self._suite_bucket(str(context.get("suite", "")))
         features.extend(
@@ -543,6 +611,8 @@ class ContextualCrossEntropyPassSelector:
     l2: float
     suite_buckets: int
     context_weight: float
+    semantic_prior_weight: float
+    action_names: list[str] | None = None
     outcomes: list[Outcome] = field(default_factory=list)
     probabilities: list[list[float]] = field(init=False)
     contextual: ContextualLinearBanditPassSelector = field(init=False)
@@ -556,6 +626,9 @@ class ContextualCrossEntropyPassSelector:
         self.smoothing = clamp(self.smoothing, 0.0, 1.0)
         self.min_prob = clamp(self.min_prob, 0.0, 1.0 / self.action_count)
         self.context_weight = clamp(self.context_weight, 0.0, 1.0)
+        self.semantic_prior_weight = clamp(self.semantic_prior_weight, 0.0, 1.0)
+        if self.action_names is not None and len(self.action_names) != self.action_count:
+            self.action_names = None
         uniform = 1.0 / self.action_count
         self.probabilities = [
             [uniform for _ in range(self.action_count)] for _ in range(self.steps)
@@ -578,6 +651,11 @@ class ContextualCrossEntropyPassSelector:
         context: dict[str, Any] | None = None,
     ) -> tuple[str, list[int]]:
         if trial <= self.warmup or len(self.outcomes) < self.elite_size:
+            if self.semantic_prior_weight > 0.0 and self.action_names:
+                distribution = self._semantic_prior_distribution(context)
+                return "semantic_prior", self._sample_from_distributions(
+                    [distribution for _ in range(self.steps)]
+                )
             return "random", random_sequence(self.rng, self.action_count, self.steps)
 
         distributions = [
@@ -640,7 +718,21 @@ class ContextualCrossEntropyPassSelector:
             + self.context_weight * context_prob
             for cem_prob, context_prob in zip(cem_probs, context_probs)
         ]
+        if self.semantic_prior_weight > 0.0 and self.action_names:
+            semantic_probs = self._semantic_prior_distribution(context)
+            blended = [
+                (1.0 - self.semantic_prior_weight) * learned_prob
+                + self.semantic_prior_weight * semantic_prob
+                for learned_prob, semantic_prob in zip(blended, semantic_probs)
+            ]
         return self._normalize_with_floor(blended)
+
+    def _semantic_prior_distribution(
+        self, context: dict[str, Any] | None
+    ) -> list[float]:
+        if not self.action_names:
+            return [1.0 / self.action_count for _ in range(self.action_count)]
+        return semantic_prior_distribution(context, self.action_names)
 
     def _contextual_distribution(
         self, context: dict[str, Any] | None, position: int
@@ -736,12 +828,21 @@ class ContextualCrossEntropyPassSelector:
             "smoothing": self.smoothing,
             "min_prob": self.min_prob,
             "context_weight": self.context_weight,
+            "semantic_prior_weight": self.semantic_prior_weight,
             "observations": len(self.outcomes),
             "elite": [
                 {"actions": item.actions, "reward": item.reward} for item in elite
             ],
             "positions": top_per_position,
             "contextual": self.contextual.snapshot(top_n=top_n),
+            "semantic_prior": {
+                "enabled": self.semantic_prior_weight > 0.0 and bool(self.action_names),
+                "top_actions_without_context": top_semantic_actions(
+                    None, self.action_names, top_n=top_n
+                )
+                if self.action_names
+                else [],
+            },
         }
 
 
@@ -761,6 +862,8 @@ def make_pass_selector(
     context_l2: float,
     context_suite_buckets: int,
     hybrid_context_weight: float = 0.35,
+    semantic_prior_weight: float = 0.0,
+    action_names: list[str] | None = None,
 ) -> PassSelector:
     if strategy == "random":
         return RandomPassSelector(action_count=action_count, steps=steps, rng=rng)
@@ -813,5 +916,7 @@ def make_pass_selector(
             l2=context_l2,
             suite_buckets=context_suite_buckets,
             context_weight=hybrid_context_weight,
+            semantic_prior_weight=semantic_prior_weight,
+            action_names=action_names,
         )
     raise ValueError(f"Unknown pass selection strategy: {strategy}")

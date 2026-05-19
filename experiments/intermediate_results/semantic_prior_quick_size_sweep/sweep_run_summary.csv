@@ -1,0 +1,3 @@
+strategy,seed,path,benchmarks,improved,avg_improvement,median_improvement,min_improvement,max_improvement,oz_beaten,avg_best_vs_oz,error_count,oz_error_count
+contextual_cem,7,experiments/runs/semantic_prior_quick_size_sweep/contextual_cem_seed7_t12_s8/subset_autotune.json,10,10,1252.3,226.0,17.0,7820.0,0,-2389.7,1,0
+contextual_cem,11,experiments/runs/semantic_prior_quick_size_sweep/contextual_cem_seed11_t12_s8/subset_autotune.json,10,10,936.3,289.0,14.0,4815.0,0,-2705.7,0,0

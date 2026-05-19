@@ -141,6 +141,15 @@ def parse_args() -> argparse.Namespace:
         help="Contextual prior weight for --strategy contextual_cem.",
     )
     parser.add_argument(
+        "--semantic-prior-weight",
+        type=float,
+        default=0.0,
+        help=(
+            "Rule-based semantic pass prior weight for --strategy contextual_cem. "
+            "A value of 0 disables it."
+        ),
+    )
+    parser.add_argument(
         "--sort-by",
         default="total_ir_insts",
         choices=("total_ir_insts", "size_gini", "selected_share_percent"),
@@ -195,6 +204,7 @@ def main() -> int:
     results = []
     with compiler_gym.make(args.env) as env:
         action_count = env.action_space.n
+        action_names = list(getattr(env.action_space, "names", []) or [])
         selector = make_pass_selector(
             strategy=args.strategy,
             action_count=action_count,
@@ -211,6 +221,8 @@ def main() -> int:
             context_l2=args.context_l2,
             context_suite_buckets=args.context_suite_buckets,
             hybrid_context_weight=args.hybrid_context_weight,
+            semantic_prior_weight=args.semantic_prior_weight,
+            action_names=action_names,
         )
         for row_index, row in enumerate(rows, start=1):
             benchmark_uri = row["benchmark_uri"]
@@ -396,6 +408,7 @@ def main() -> int:
             "cem_smoothing": args.cem_smoothing,
             "cem_min_prob": args.cem_min_prob,
             "hybrid_context_weight": args.hybrid_context_weight,
+            "semantic_prior_weight": args.semantic_prior_weight,
         },
         "model": selector.snapshot(),
         "results": results,

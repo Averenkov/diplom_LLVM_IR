@@ -1,0 +1,5 @@
+strategy,seed,path,benchmarks,improved,avg_improvement,median_improvement,min_improvement,max_improvement,oz_beaten,avg_best_vs_oz,error_count,oz_error_count
+cem,7,experiments/runs/semantic_context_quick_size_sweep/cem_seed7_t12_s8/subset_autotune.json,10,10,1282.4,239.0,41.0,8281.0,0,-2359.6,0,0
+cem,11,experiments/runs/semantic_context_quick_size_sweep/cem_seed11_t12_s8/subset_autotune.json,10,10,524.1,229.0,6.0,1702.0,0,-3117.9,0,0
+contextual_cem,7,experiments/runs/semantic_context_quick_size_sweep/contextual_cem_seed7_t12_s8/subset_autotune.json,10,10,1404.4,169.0,20.0,9945.0,0,-2237.6,0,0
+contextual_cem,11,experiments/runs/semantic_context_quick_size_sweep/contextual_cem_seed11_t12_s8/subset_autotune.json,10,10,620.0,306.5,29.0,1784.0,1,-3022.0,0,0

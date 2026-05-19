@@ -92,6 +92,15 @@ top20-biggest-funcs
 Эти веса можно использовать как метод переноса function-level сигналов
 на уровень всей единицы трансляции.
 
+Для semantic-aware autotuning pass также сохраняет структурные признаки функций.
+В `top_functions` и `function_instruction_counts` для каждой функции есть
+счетчики basic blocks, branches, calls, loads/stores, allocas, phi nodes,
+getelementptr, casts, compares, selects, integer/float/vector operations и
+производные плотности вроде `memory_density`, `call_density`,
+`branch_density`, `vector_density`. На уровне модуля дополнительно пишутся
+`module_semantic_profile` и `selected_semantic_profile`; второй агрегирует
+только baseline top-20% функций и используется как контекст модели.
+
 ## Интеграция с CompilerGym
 
 Подготовлен базовый мост `python/compile_gym_bridge.py`, который:
@@ -278,7 +287,9 @@ experiments/runs/<timestamp>/
 - `contextual` / `contextual_bandit` - линейный contextual bandit, который
   выбирает pass/action id с учетом baseline-признаков benchmark'а:
   `suite`, `functions_defined`, `total_ir_insts`, `selected_share_percent`,
-  `size_gini`, `size_concentration_hhi`;
+  `size_gini`, `size_concentration_hhi`, а также semantic profile выбранных
+  top-функций: call/memory/branch/vector/float/integer densities,
+  basic-block density и loop-like score;
 - `cem` - Cross-Entropy Method: модель учит категориальное распределение
   pass/action id для каждой позиции последовательности и сдвигает его к elite
   последовательностям с лучшим приростом objective относительно baseline;
@@ -300,6 +311,14 @@ pass/action id для каждой позиции.
 Значение `0` эквивалентно чистому CEM-распределению, а значение `1` полностью
 полагается на contextual prior при сэмплировании кандидатов.
 
+Дополнительно можно включить rule-based semantic prior:
+`--semantic-prior-weight`. Этот слой сопоставляет semantic profile top-функций
+с группами pass-ов: memory-heavy функции получают prior на `sroa`, `mem2reg`,
+`dse`, `gvn`; branch-heavy - на `simplifycfg`, `jump-threading`,
+`correlated-propagation`; call-heavy - на `functionattrs`, `ipsccp`,
+`deadargelim`; loop-like - на `loop-simplify`, `lcssa`, `indvars`. По
+умолчанию вес равен `0`, поэтому prior отключен.
+
 Для size-oriented экспериментов можно минимизировать общий размер IR:
 
 ```bash
@@ -308,6 +327,7 @@ pass/action id для каждой позиции.
   --strategy contextual_cem \
   --objective total_ir_insts \
   --objective-direction minimize \
+  --semantic-prior-weight 0.20 \
   --trials 30 \
   --steps 12
 ```

@@ -1,0 +1,2 @@
+strategy,runs,avg_improvement_mean,avg_improvement_std,avg_improvement_min,avg_improvement_max,improved_mean,oz_beaten_mean,avg_best_vs_oz_mean,total_errors,total_oz_errors,wins
+contextual_cem,2,1094.3,223.44574285494903,936.3,1252.3,10.0,0.0,-2547.7,1,0,20

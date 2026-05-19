@@ -91,13 +91,16 @@ def evaluate_opt_level(
 
 def summarize_payload(payload: dict[str, Any], objective: str) -> dict[str, Any]:
     tu_metrics = payload.get("translation_unit_aggregation", {})
+    selected_semantics = payload.get("selected_semantic_profile", {})
     return {
         "objective_value": lookup_objective(payload, objective),
         "functions_defined": payload.get("functions_defined"),
         "total_ir_insts": payload.get("total_ir_insts"),
+        "selected_ir_insts": payload.get("selected_ir_insts"),
         "selected_share_percent": payload.get("selected_share_percent"),
         "size_gini": tu_metrics.get("size_gini"),
         "size_concentration_hhi": tu_metrics.get("size_concentration_hhi"),
+        "selected_semantic_profile": selected_semantics,
     }
 
 
@@ -163,14 +166,36 @@ def make_benchmark_context(
     row: dict[str, str],
     baseline_summary: dict[str, Any],
 ) -> dict[str, Any]:
+    selected_semantics = baseline_summary.get("selected_semantic_profile") or {}
     return {
         "suite": row.get("suite", ""),
         "functions_defined": baseline_summary.get("functions_defined") or 0,
         "total_ir_insts": baseline_summary.get("total_ir_insts") or 0,
+        "selected_ir_insts": baseline_summary.get("selected_ir_insts") or 0,
         "selected_share_percent": baseline_summary.get("selected_share_percent") or 0.0,
         "size_gini": baseline_summary.get("size_gini") or 0.0,
         "size_concentration_hhi": baseline_summary.get("size_concentration_hhi")
         or 0.0,
+        "selected_semantic_profile": selected_semantics,
+        "semantic_call_density": selected_semantics.get("call_density") or 0.0,
+        "semantic_memory_density": selected_semantics.get("memory_density") or 0.0,
+        "semantic_branch_density": selected_semantics.get("branch_density") or 0.0,
+        "semantic_conditional_branch_density": selected_semantics.get(
+            "conditional_branch_density"
+        )
+        or 0.0,
+        "semantic_phi_density": selected_semantics.get("phi_density") or 0.0,
+        "semantic_alloca_density": selected_semantics.get("alloca_density") or 0.0,
+        "semantic_vector_density": selected_semantics.get("vector_density") or 0.0,
+        "semantic_float_density": selected_semantics.get("float_density") or 0.0,
+        "semantic_integer_density": selected_semantics.get("integer_density") or 0.0,
+        "semantic_compare_density": selected_semantics.get("compare_density") or 0.0,
+        "semantic_select_density": selected_semantics.get("select_density") or 0.0,
+        "semantic_basic_blocks_per_function": selected_semantics.get(
+            "basic_blocks_per_function"
+        )
+        or 0.0,
+        "semantic_loop_like_score": selected_semantics.get("loop_like_score") or 0.0,
     }
 
 
